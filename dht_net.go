@@ -32,14 +32,25 @@ type tcpBodyRespDHTKeys struct {
 
 // New Vnode operations added for supporting DHT
 
+type DHTStorage struct {
+	kv map[string][]byte
+}
+
 func (vn *localVnode) DHTGet(ringId string, key string) ([]byte, error) {
-	return nil, nil
+
+	value := vn.store[ringId].kv[key]
+
+	return value, nil
 }
 
 func (vn *localVnode) DHTSet(ringId string, key string, value []byte) error {
+
+	vn.store[ringId].kv[key] = value
+
 	return nil
 }
 
 func (vn *localVnode) DHTList(ringId string) ([]string, error) {
+
 	return nil, nil
 }

@@ -71,6 +71,7 @@ type Config struct {
 	NumSuccessors int              // Number of successors to maintain
 	Delegate      Delegate         // Invoked to handle ring events
 	hashBits      int              // Bit size of the hash function
+	RingId        string
 }
 
 // Represents an Vnode, local or remote
@@ -89,6 +90,11 @@ type localVnode struct {
 	predecessor *Vnode
 	stabilized  time.Time
 	timer       *time.Timer
+	/* TODO: Make all the above fields per Ring and move 'store'
+	 * to per ring per node structure. For now having it as a map
+	 * based on ring.
+	 */
+	store map[string]*DHTStorage
 }
 
 // Stores the state required for a Chord ring
@@ -111,6 +117,8 @@ func DefaultConfig(hostname string) *Config {
 		8,   // 8 successors
 		nil, // No delegate
 		160, // 160bit hash function
+		// TODO: Add the ringId
+		"",
 	}
 }
 
@@ -144,6 +152,12 @@ func Join(conf *Config, trans Transport, existing string) (*Ring, error) {
 	// Create a ring
 	ring := &Ring{}
 	ring.init(conf, trans)
+
+	// Create the key-value store
+	for _, vn := range ring.vnodes {
+		// TODO: ring name?
+		vn.store[conf.RingId] = &DHTStorage{}
+	}
 
 	// Acquire a live successor for each Vnode
 	for _, vn := range ring.vnodes {
