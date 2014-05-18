@@ -49,6 +49,9 @@ const (
 	tcpFindSucReq
 	tcpClearPredReq
 	tcpSkipSucReq
+       tcpDHTGet
+       tcpDHTSet
+       tcpDHTList
 )
 
 type tcpHeader struct {
@@ -790,6 +793,67 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Target.Host, body.Target.String())
+			}
+
+		case tcpDHTGet:
+			body := tcpBodyVnode{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyRespDHTValue{}
+			sendResp = &resp
+			if ok {
+				value, err := obj.DHTGet (body.ringId, body.key)
+				resp.Value = value
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpDHTSet:
+			body := tcpBodyVnode{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyError {}
+			sendResp = &resp
+			if ok {
+				err :=
+                            obj.DHTSet (body.ringId, body.key, body.value)
+
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpDHTList:
+			body := tcpBodyVnode{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyError {}
+			sendResp = &resp
+			if ok {
+				keys, err := obj.DHTList (body.ringId)
+				resp.keys = keys
+                            resp.err  = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
 			}
 
 		default:

@@ -45,6 +45,9 @@ type VnodeRPC interface {
 	FindSuccessors(int, []byte) ([]*Vnode, error)
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
+       DHTGet (ringId string, key string) ([]byte, error)
+       DHTSet (ringId string, key string, value []byte) error
+       DHTList (ringId string) ([]string, error)
 }
 
 // Delegate to notify on ring events
