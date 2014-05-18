@@ -796,64 +796,64 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			}
 
 		case tcpDHTGet:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTGet {}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
+			obj, ok := t.get(body.Vnode)
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-				value, err := obj.DHTGet (body.ringId, body.key)
+				value, err := obj.DHTGet (body.RingId, body.Key)
 				resp.Value = value
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		case tcpDHTSet:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTSet {}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
+			obj, ok := t.get(body.Vnode)
 			resp := tcpBodyError {}
 			sendResp = &resp
 			if ok {
 				err :=
-                            obj.DHTSet (body.ringId, body.key, body.value)
+                            obj.DHTSet (body.RingId, body.Key, body.Value)
 
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		case tcpDHTList:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTList {}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
-			resp := tcpBodyError {}
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyRespDHTKeys {}
 			sendResp = &resp
 			if ok {
-				keys, err := obj.DHTList (body.ringId)
-				resp.keys = keys
-                            resp.err  = err
+				keys, err := obj.DHTList (body.RingId)
+				resp.Keys = keys
+                            resp.Err  = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		default:
