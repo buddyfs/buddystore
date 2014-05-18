@@ -38,4 +38,3 @@ func (vn *localVnode) DHTSet (ringId string, key string, value []byte) (error) {
 func (vn *localVnode) DHTList (ringId string) ([]string, error) {
 }
 
-
