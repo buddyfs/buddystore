@@ -1,5 +1,7 @@
 # Go Chord
 
+[![Build Status](https://drone.io/github.com/narendran/go-chord/status.png)](https://drone.io/github.com/narendran/go-chord/latest)
+
 This package provides a Golang implementation of the Chord protocol.
 Chord is used to organize nodes along a ring in a consistent way. It can be
 used to distribute work, build a key/value store, or serve as the underlying
