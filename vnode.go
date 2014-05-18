@@ -26,6 +26,9 @@ func (vn *localVnode) init(idx int) {
 
 	// Register with the RPC mechanism
 	vn.ring.transport.Register(&vn.Vnode, vn)
+
+       // Initialise the key-value store
+       vn.store = make (map[string]*DHTStorage)
 }
 
 // Schedules the Vnode to do regular maintenence

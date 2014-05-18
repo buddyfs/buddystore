@@ -9,7 +9,7 @@ import (
 )
 
 type DHTStore struct {
-	ring *Ring
+    ring   *Ring
 }
 
 type DHTStoreIntf interface {
