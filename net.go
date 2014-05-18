@@ -452,7 +452,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 	}
 }
 
-/* Gets the value of a given key - This operation is additional to what is there in the interface already
+/* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
 func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
@@ -504,7 +504,7 @@ func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte,
 
 }
 
-/* Sets the value of a given key - This operation is additional to what is there in the interface already
+/* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
 func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
@@ -557,7 +557,7 @@ func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []
 
 }
 
-/* Lists the keys for a particular ring - This operation is additional to what is there in the interface already
+/* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
 func (t *TCPTransport) DHTList(target *Vnode, ringId string) ([]string, error) {

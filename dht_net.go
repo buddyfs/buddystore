@@ -30,6 +30,8 @@ type tcpBodyRespDHTKeys struct {
 	Err  error
 }
 
+// New Vnode operations added for supporting DHT
+
 func (vn *localVnode) DHTGet(ringId string, key string) ([]byte, error) {
 	return nil, nil
 }
