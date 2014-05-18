@@ -2,39 +2,42 @@ package chord
 
 /* TCP body for DHT requests */
 type tcpBodyDHTGet struct {
-    ringId   string
-    Vnode   *Vnode
-    key      string
+	RingId string
+	Vnode  *Vnode
+	Key    string
 }
 
 type tcpBodyDHTSet struct {
-    ringId    string
-    Vnode    *Vnode
-    key       string
-    value   []byte
+	RingId string
+	Vnode  *Vnode
+	Key    string
+	Value  []byte
 }
 
 type tcpBodyDHTList struct {
-    ringId    string
-    Vnode    *Vnode
+	RingId string
+	Vnode  *Vnode
 }
 
 /* TCP body for DHT responses */
 type tcpBodyRespDHTValue struct {
-    Value []byte
-    Err     error
+	Value []byte
+	Err   error
 }
 
 type tcpBodyRespDHTKeys struct {
-    keys   []string
-    Err      error
+	Keys []string
+	Err  error
 }
 
-func (vn *localVnode) DHTGet (ringId string, key string) ([]byte, error) {
+func (vn *localVnode) DHTGet(ringId string, key string) ([]byte, error) {
+	return nil, nil
 }
 
-func (vn *localVnode) DHTSet (ringId string, key string, value []byte) (error) {}
-
-func (vn *localVnode) DHTList (ringId string) ([]string, error) {
+func (vn *localVnode) DHTSet(ringId string, key string, value []byte) error {
+	return nil
 }
 
+func (vn *localVnode) DHTList(ringId string) ([]string, error) {
+	return nil, nil
+}

@@ -49,9 +49,9 @@ const (
 	tcpFindSucReq
 	tcpClearPredReq
 	tcpSkipSucReq
-       tcpDHTGet
-       tcpDHTSet
-       tcpDHTList
+	tcpDHTGet
+	tcpDHTSet
+	tcpDHTList
 )
 
 type tcpHeader struct {
@@ -452,17 +452,161 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 	}
 }
 
-// Gets the value of a given key
-func (t *TCPTransport) Get(target *Vnode, ringId string, key string) ([]byte, error) {
-  // Get a conn
-  out, err := t.getConn(target.Host)
-  if err != nil {
-    return err
-  }
+/* Gets the value of a given key - This operation is additional to what is there in the interface already
+ */
 
-  respChan := make(chan bool, 1)
-  errChan := make(chan error, 1)
+func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return make([]byte, 0), err
+	}
 
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyRespDHTValue{}
+	go func() {
+		out.header.ReqType = tcpDHTGet
+		body := tcpBodyDHTGet{RingId: ringId, Vnode: target, Key: key}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return make([]byte, 0), fmt.Errorf("Command timed out!")
+	case err := <-errChan:
+		return make([]byte, 0), err
+	case _ = <-respChan:
+		return resp.Value, nil
+	}
+
+}
+
+/* Sets the value of a given key - This operation is additional to what is there in the interface already
+ */
+
+func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyError{}
+
+	go func() {
+		out.header.ReqType = tcpDHTSet
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		body := tcpBodyDHTSet{RingId: ringId, Vnode: target, Key: key, Value: value}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return fmt.Errorf("Command timed out!")
+	case err := <-errChan:
+		return err
+	case _ = <-respChan:
+		return nil
+	}
+
+}
+
+/* Lists the keys for a particular ring - This operation is additional to what is there in the interface already
+ */
+
+func (t *TCPTransport) DHTList(target *Vnode, ringId string) ([]string, error) {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return make([]string, 0), err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyRespDHTKeys{}
+
+	go func() {
+		out.header.ReqType = tcpDHTList
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		body := tcpBodyDHTList{RingId: ringId, Vnode: target}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return make([]string, 0), fmt.Errorf("Command timed out!")
+	case err := <-errChan:
+		return make([]string, 0), err
+	case _ = <-respChan:
+		return resp.Keys, nil
+	}
 
 }
 
@@ -810,64 +954,64 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			}
 
 		case tcpDHTGet:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTGet{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
+			obj, ok := t.get(body.Vnode)
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-				value, err := obj.DHTGet (body.ringId, body.key)
+				value, err := obj.DHTGet(body.RingId, body.Key)
 				resp.Value = value
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		case tcpDHTSet:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTSet{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
-			resp := tcpBodyError {}
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
 				err :=
-                            obj.DHTSet (body.ringId, body.key, body.value)
+					obj.DHTSet(body.RingId, body.Key, body.Value)
 
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		case tcpDHTList:
-			body := tcpBodyVnode{}
+			body := tcpBodyDHTList{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
 			}
 
 			// Generate a response
-			obj, ok := t.get(body.Vn)
-			resp := tcpBodyError {}
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyRespDHTKeys{}
 			sendResp = &resp
 			if ok {
-				keys, err := obj.DHTList (body.ringId)
-				resp.keys = keys
-                            resp.err  = err
+				keys, err := obj.DHTList(body.RingId)
+				resp.Keys = keys
+				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+					body.Vnode.Host, body.Vnode.String())
 			}
 
 		default:
