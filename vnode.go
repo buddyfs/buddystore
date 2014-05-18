@@ -351,3 +351,18 @@ func (vn *localVnode) knownSuccessors() (successors int) {
 	}
 	return
 }
+
+// Implementation of DHTGet operation on the receiver side
+func (vn *localVnode) DHTGet (ringId string, key string) ([]byte, error) {
+  return nil, nil
+}
+
+// Implementation of DHTSet operation on the receiver side
+func (vn *localVnode) DHTSet (ringId string, key string, value []byte) error {
+  return nil
+}
+
+// Implementation of DHTList operation on the receiver side
+func (vn *locaVnode) DHTList (ringId string) ([]string, error) {
+  return nil, nil
+}

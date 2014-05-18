@@ -36,6 +36,7 @@ type Transport interface {
 
 	// Register for an RPC callbacks
 	Register(*Vnode, VnodeRPC)
+
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -45,9 +46,11 @@ type VnodeRPC interface {
 	FindSuccessors(int, []byte) ([]*Vnode, error)
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
-       DHTGet (ringId string, key string) ([]byte, error)
-       DHTSet (ringId string, key string, value []byte) error
-       DHTList (ringId string) ([]string, error)
+  
+  // Added for the DHT operations
+  DHTGet (ringId string, key string) ([]byte, error)
+  DHTSet (ringId string, key string, value []byte) error
+  DHTList (ringId string) ([]string, error)
 }
 
 // Delegate to notify on ring events

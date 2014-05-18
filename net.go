@@ -452,6 +452,20 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 	}
 }
 
+// Gets the value of a given key
+func (t *TCPTransport) Get(target *Vnode, ringId string, key string) ([]byte, error) {
+  // Get a conn
+  out, err := t.getConn(target.Host)
+  if err != nil {
+    return err
+  }
+
+  respChan := make(chan bool, 1)
+  errChan := make(chan error, 1)
+
+
+}
+
 // Clears a predecessor if it matches a given vnode. Used to leave.
 func (t *TCPTransport) ClearPredecessor(target, self *Vnode) error {
 	// Get a conn

@@ -20,12 +20,12 @@ type tcpBodyDHTList struct {
 }
 
 /* TCP body for DHT responses */
-type tcpBodyRespDHTValue {
+type tcpBodyRespDHTValue struct {
     Value []byte
     Err     error
 }
 
-type tcpBodyRespDHTKeys {
+type tcpBodyRespDHTKeys struct {
     keys   []string
     Err      error
 }
