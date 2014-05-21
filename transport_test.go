@@ -37,6 +37,18 @@ func (mv *MockVnodeRPC) SkipSuccessor(s *Vnode) error {
 	return nil
 }
 
+func (mv *MockVnodeRPC) DHTGet(ringId string, key string) ([]byte, error) {
+    return nil, nil
+}
+
+func (mv *MockVnodeRPC) DHTSet(ringId string, key string, value []byte) error {
+       return nil
+}
+
+func (mv *MockVnodeRPC) DHTList(ringId string) ([]string, error) {
+       return nil, nil
+}
+
 func makeLocal() *LocalTransport {
 	return InitLocalTransport(nil).(*LocalTransport)
 }
