@@ -1,6 +1,6 @@
+package chord
+
 type KVStoreClient interface {
-    Get (key string) (val []byte, error)
-    Set (key string, []byte val) (error)
+	Get(key string) ([]byte, error)
+	Set(key string, val []byte) error
 }
-
-

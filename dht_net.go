@@ -2,18 +2,18 @@ package chord
 
 /* TCP body for DHT requests */
 type tcpBodyDHTGet struct {
-	Vnode  *Vnode
-	Key    string
+	Vnode *Vnode
+	Key   string
 }
 
 type tcpBodyDHTSet struct {
-	Vnode  *Vnode
-	Key    string
-	Value  []byte
+	Vnode *Vnode
+	Key   string
+	Value []byte
 }
 
 type tcpBodyDHTList struct {
-	Vnode  *Vnode
+	Vnode *Vnode
 }
 
 /* TCP body for DHT responses */

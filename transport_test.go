@@ -38,15 +38,15 @@ func (mv *MockVnodeRPC) SkipSuccessor(s *Vnode) error {
 }
 
 func (mv *MockVnodeRPC) DHTGet(ringId string, key string) ([]byte, error) {
-    return nil, nil
+	return nil, nil
 }
 
 func (mv *MockVnodeRPC) DHTSet(ringId string, key string, value []byte) error {
-       return nil
+	return nil
 }
 
 func (mv *MockVnodeRPC) DHTList(ringId string) ([]string, error) {
-       return nil, nil
+	return nil, nil
 }
 
 func makeLocal() *LocalTransport {
