@@ -162,6 +162,12 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 	lt.lock.Unlock()
 }
 
+func (lt *LocalTransport) RLock(targetLm *Vnode, key string) (string, uint, error) {
+	lmVnodeRpc, _ := lt.get(targetLm)
+	lockID, version, err := lmVnodeRpc.RLock(key)
+	return lockID, version, err
+}
+
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {
@@ -196,4 +202,8 @@ func (*BlackholeTransport) SkipSuccessor(target, self *Vnode) error {
 }
 
 func (*BlackholeTransport) Register(v *Vnode, o VnodeRPC) {
+}
+
+func (*BlackholeTransport) RLock(v *Vnode, key string) (string, uint, error) {
+	return "", 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }

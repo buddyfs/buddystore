@@ -36,6 +36,9 @@ type Transport interface {
 
 	// Register for an RPC callbacks
 	Register(*Vnode, VnodeRPC)
+
+	//  Method to create the request message for RLock from client
+	RLock(*Vnode, string) (string, uint, error)
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -50,6 +53,7 @@ type VnodeRPC interface {
 	DHTGet(ringId string, key string) ([]byte, error)
 	DHTSet(ringId string, key string, value []byte) error
 	DHTList(ringId string) ([]string, error)
+	RLock(key string) (string, uint, error)
 }
 
 // Delegate to notify on ring events

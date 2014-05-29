@@ -52,6 +52,7 @@ const (
 	tcpDHTGet
 	tcpDHTSet
 	tcpDHTList
+	tcpRLockReq
 )
 
 type tcpHeader struct {
@@ -525,7 +526,7 @@ func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTSet{ Vnode: target, Key: key, Value: value}
+		body := tcpBodyDHTSet{Vnode: target, Key: key, Value: value}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -578,7 +579,7 @@ func (t *TCPTransport) DHTList(target *Vnode, ringId string) ([]string, error) {
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTList{ Vnode: target}
+		body := tcpBodyDHTList{Vnode: target}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -796,6 +797,60 @@ func (t *TCPTransport) listen() {
 	}
 }
 
+/*
+RLock tranasport layer implementation
+Param Vnode : The destination Vnode i.e. the Lock Manager
+Param key : The key for which the read lock should be obtained
+*/
+func (t *TCPTransport) RLock(target *Vnode, key string) (string, uint, error) {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return "", 0, err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyLMRLockResp{}
+	go func() {
+		// Send a list command
+		out.header.ReqType = tcpRLockReq
+		body := tcpBodyLMRLockReq{Vn: target, Key: key}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return "", 0, fmt.Errorf("Command timed out!")
+	case _ = <-errChan:
+		return "", 0, resp.Err
+	case <-respChan:
+		return resp.LockId, resp.Version, resp.Err
+	}
+}
+
 // Handles inbound TCP connections
 func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 	// Defer the cleanup
@@ -965,7 +1020,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-                value, err := obj.DHTGet(string(body.Vnode.Id[:]), body.Key)
+				value, err := obj.DHTGet(string(body.Vnode.Id[:]), body.Key)
 				resp.Value = value
 				resp.Err = err
 			} else {
@@ -986,7 +1041,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if ok {
 				err :=
-                obj.DHTSet(string(body.Vnode.Id[:]),  body.Key, body.Value)
+					obj.DHTSet(string(body.Vnode.Id[:]), body.Key, body.Value)
 
 				resp.Err = err
 			} else {
@@ -1006,7 +1061,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTKeys{}
 			sendResp = &resp
 			if ok {
-                keys, err := obj.DHTList(string(body.Vnode.Id[:]))
+				keys, err := obj.DHTList(string(body.Vnode.Id[:]))
 				resp.Keys = keys
 				resp.Err = err
 			} else {
