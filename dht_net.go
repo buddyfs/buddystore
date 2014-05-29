@@ -2,20 +2,17 @@ package chord
 
 /* TCP body for DHT requests */
 type tcpBodyDHTGet struct {
-	RingId string
 	Vnode  *Vnode
 	Key    string
 }
 
 type tcpBodyDHTSet struct {
-	RingId string
 	Vnode  *Vnode
 	Key    string
 	Value  []byte
 }
 
 type tcpBodyDHTList struct {
-	RingId string
 	Vnode  *Vnode
 }
 

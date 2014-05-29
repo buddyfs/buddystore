@@ -5,7 +5,7 @@ type DHTTransport struct {
 }
 
 type DHTTransportIntf interface {
-	Get(string, string) ([]byte, error)
-	Set(string, string, []byte) error
-	List(string) []string
+	DHTGet(string, string) ([]byte, error)
+	DHTSet(string, string, []byte) error
+	DHTList(string) []string
 }

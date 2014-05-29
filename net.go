@@ -455,7 +455,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 /* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
+func (t *Transport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -507,7 +507,7 @@ func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte,
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
+func (t *Transport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -560,7 +560,7 @@ func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []
 /* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTList(target *Vnode, ringId string) ([]string, error) {
+func (t *Transport) DHTList(target *Vnode, ringId string) ([]string, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
