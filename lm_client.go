@@ -42,7 +42,7 @@ func (lm *LManager) RLock(key string, forceNoCache bool) (version uint, err erro
 			return rLock.version, nil
 		}
 	}
-	LMVnodes, err := lm.Ring.Lookup(NUM_LM_REPLICAS, []byte(key))
+	LMVnodes, err := lm.Ring.Lookup(NUM_LM_REPLICAS, []byte(lm.Ring.config.RingId)) // TODO : Come up with a dynamic lock manager lookup protocol
 	if err != nil {
 		return 0, err
 	}
@@ -52,5 +52,5 @@ func (lm *LManager) RLock(key string, forceNoCache bool) (version uint, err erro
 	retLockID, ver, err := lm.Ring.transport.RLock(LMVnodes[0], key)
 	lm.RLocks[key] = &RLockVal{lockID: retLockID, version: ver}
 
-	return 0, nil
+	return ver, err
 }
