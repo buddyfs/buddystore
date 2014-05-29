@@ -28,9 +28,10 @@ func (kv *DHTStore) DHTGet(key string) ([]byte, error) {
 	}
 
 	fmt.Print(succVnodes)
-	res, errDhtGet := kv.ring.transport.DHTGet(succVnodes[0], "abcd", key)
-	fmt.Println(res)
-	return res, nil
+	//  res, errDhtGet := kv.ring.transport.DHTGet(succVnodes[0], "abcd", key)
+	//  fmt.Println(res)
+	//  return res, nil
+    return nil, nil
 }
 
 /* Get the public key from .ssh folder and start SET RPC */
@@ -41,8 +42,9 @@ func (kv *DHTStore) DHTSet(key string, value []byte) error {
 	}
 
 	fmt.Print(succVnodes)
-	errDhtSet := kv.ring.transport.DHTSet(succVnodes[0], "abcd", key, value)
-	return errDhtSet
+	//  errDhtSet := kv.ring.transport.DHTSet(succVnodes[0], "abcd", key, value)
+	//  return errDhtSet
+    return nil
 }
 
 /* Get the public key from .ssh folder and start LIST RPC */
