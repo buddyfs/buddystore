@@ -1,8 +1,9 @@
 package chord
 
 type tcpBodyLMRLockReq struct {
-	Vn  *Vnode
-	Key string
+	Vn       *Vnode
+	SenderID string
+	Key      string
 }
 
 type tcpBodyLMRLockResp struct {
@@ -12,22 +13,24 @@ type tcpBodyLMRLockResp struct {
 }
 
 type tcpBodyLMWLockReq struct {
-	RingId  string
-	Key     string
-	Version int
-	Timeout uint
+	Vn       *Vnode
+	SenderID string
+	Key      string
+	Version  int
+	Timeout  uint
 }
 
-type tcpBodyLMLockResp struct {
+type tcpBodyLMWLockResp struct {
 	LockId  string
 	Timeout uint
 	Err     error
 }
 
 type tcpBodyCommitWLockReq struct {
-	RingId  string
-	Key     string
-	Version int
+	Vn       *Vnode
+	SenderID string
+	Key      string
+	Version  int
 }
 
 type tcpBodyCommitWLockResp struct {
@@ -35,7 +38,12 @@ type tcpBodyCommitWLockResp struct {
 }
 
 type tcpBodyAbortWLockReq struct {
-	RingId  string
-	Key     string
-	Version uint
+	Vn       *Vnode
+	SenderID string
+	Key      string
+	Version  uint
+}
+
+type tcpBodyAbortWLockResp struct {
+	Err error
 }

@@ -88,7 +88,7 @@ func (ml *MultiLocalTrans) Deregister(host string) {
 	delete(ml.hosts, host)
 }
 
-func (ml *MultiLocalTrans) RLock(v *Vnode, key string) (string, uint, error) {
+func (ml *MultiLocalTrans) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
 	//  TODO : Are we going to use this transport. Placeholder
 	return "", 0, fmt.Errorf("MultiLocalTransport not implemented yet")
 }

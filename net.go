@@ -802,7 +802,7 @@ RLock tranasport layer implementation
 Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 */
-func (t *TCPTransport) RLock(target *Vnode, key string) (string, uint, error) {
+func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string) (string, uint, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -816,7 +816,7 @@ func (t *TCPTransport) RLock(target *Vnode, key string) (string, uint, error) {
 	go func() {
 		// Send a list command
 		out.header.ReqType = tcpRLockReq
-		body := tcpBodyLMRLockReq{Vn: target, Key: key}
+		body := tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return

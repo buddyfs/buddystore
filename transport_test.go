@@ -49,7 +49,7 @@ func (mv *MockVnodeRPC) DHTList(ringId string) ([]string, error) {
 	return nil, nil
 }
 
-func (mv *MockVnodeRPC) RLock(key string) (string, uint, error) {
+func (mv *MockVnodeRPC) RLock(key string, nodeID string) (string, uint, error) {
 	return "", 0, nil
 }
 

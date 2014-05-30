@@ -22,10 +22,10 @@ func TestRLockTCP(t *testing.T) {
 	}
 
 	//  We have a Ring with TCPTransport. Create a LockManager using this ring
-	lm := &LManager{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	retVersion, err := lm.RLock("test_key", false)
 	if err != nil {
-		t.Fatalf("Error while getting Read Lock " , err)
+		t.Fatalf("Error while getting Read Lock ", err)
 	}
 	fmt.Println(retVersion)
 	r.Shutdown()

@@ -38,7 +38,7 @@ type Transport interface {
 	Register(*Vnode, VnodeRPC)
 
 	//  Method to create the request message for RLock from client
-	RLock(*Vnode, string) (string, uint, error)
+	RLock(*Vnode, string, string) (string, uint, error)
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -53,7 +53,7 @@ type VnodeRPC interface {
 	DHTGet(ringId string, key string) ([]byte, error)
 	DHTSet(ringId string, key string, value []byte) error
 	DHTList(ringId string) ([]string, error)
-	RLock(key string) (string, uint, error)
+	RLock(key string, nodeID string) (string, uint, error)
 }
 
 // Delegate to notify on ring events
@@ -98,6 +98,7 @@ type localVnode struct {
 	 * to per ring per node structure. For now having it as a map
 	 * based on ring.
 	 */
+	lm    LManager
 	store map[string]*DHTStorage
 }
 

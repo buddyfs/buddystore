@@ -162,9 +162,9 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 	lt.lock.Unlock()
 }
 
-func (lt *LocalTransport) RLock(targetLm *Vnode, key string) (string, uint, error) {
+func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (string, uint, error) {
 	lmVnodeRpc, _ := lt.get(targetLm)
-	lockID, version, err := lmVnodeRpc.RLock(key)
+	lockID, version, err := lmVnodeRpc.RLock(key, nodeID)
 	return lockID, version, err
 }
 
@@ -204,6 +204,6 @@ func (*BlackholeTransport) SkipSuccessor(target, self *Vnode) error {
 func (*BlackholeTransport) Register(v *Vnode, o VnodeRPC) {
 }
 
-func (*BlackholeTransport) RLock(v *Vnode, key string) (string, uint, error) {
+func (*BlackholeTransport) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
 	return "", 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
