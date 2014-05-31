@@ -63,3 +63,61 @@ func TestReadLock(t *testing.T) {
 	}
 	r.Shutdown()
 }
+
+func TestAbortLock(t *testing.T) {
+	var listen string = fmt.Sprintf("localhost:%d", PORT+3)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+
+	readVersion, err := lm.RLock(TEST_KEY, true)
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+	version, err = lm.WLock(TEST_KEY, 2, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+	readVersion, err = lm.RLock(TEST_KEY, true)
+	if readVersion != 2 {
+		t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
+	}
+	version, err = lm.WLock(TEST_KEY, 3, 10)
+	err = lm.AbortWLock(TEST_KEY, version)
+    if err != nil {
+        t.Fatalf("Error while trying to Abort a write lock : ",err)
+    }
+
+	readVersion, err = lm.RLock(TEST_KEY, true)
+	if readVersion != 2 {
+		t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
+	}
+
+	r.Shutdown()
+}
+
+func TestReadLockCached(t *testing.T) {
+    var listen string = fmt.Sprintf("localhost:%d", PORT+4)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+
+	readVersion, err := lm.RLock(TEST_KEY, false)
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+	version, err = lm.WLock(TEST_KEY, 2, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+	readVersion, err = lm.RLock(TEST_KEY, false)
+    if err != nil {
+        t.Fatalf("Error while reading from Read Cache")
+    }
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+    r.Shutdown()
+}
