@@ -53,6 +53,9 @@ const (
 	tcpDHTSet
 	tcpDHTList
 	tcpRLockReq
+	tcpWLockReq
+	tcpCommitWLockReq
+	tcpAbortWLockReq
 )
 
 type tcpHeader struct {
@@ -851,6 +854,172 @@ func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string) (string, 
 	}
 }
 
+/*
+WLock transport layer implementation
+Param Vnode : The destination Vnode i.e. the Vnode with the Lock Manager
+Param key : The key for which the write lock should be obtained
+Param version : The version of the key
+Param timeout : Requested Timeout value.
+Param NodeID : NodeID of the requesting node
+*/
+func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyLMWLockResp{}
+	go func() {
+		// Send a list command
+		out.header.ReqType = tcpWLockReq
+        body := tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return "", 0, 0, fmt.Errorf("Command timed out!")
+	case _ = <-errChan:
+		return "", 0, 0, resp.Err
+	case <-respChan:
+		return resp.LockId, resp.Version, resp.Timeout, resp.Err
+	}
+}
+
+/*
+CommitWLock transport layer implementation
+Param Vnode : The destination Vnode i.e. the Lock Manager
+Param key : The key for which the read lock should be obtained
+Param version : The version of the key to be committed
+*/
+func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, nodeID string) error {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyLMCommitWLockResp{}
+	go func() {
+		// Send a list command
+		out.header.ReqType = tcpCommitWLockReq
+        body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return fmt.Errorf("Command timed out!")
+	case _ = <-errChan:
+		return resp.Err
+	case <-respChan:
+		return resp.Err
+	}
+}
+
+/*
+AbortWLock transport layer implementation
+Param Vnode : The destination Vnode i.e. the Lock Manager
+Param key : The key for which the read lock should be obtained
+*/
+func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeID string) error {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyLMAbortWLockResp{}
+	go func() {
+		// Send a list command
+		out.header.ReqType = tcpAbortWLockReq
+        body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return fmt.Errorf("Command timed out!")
+	case _ = <-errChan:
+		return resp.Err
+	case <-respChan:
+		return resp.Err
+	}
+}
+
 // Handles inbound TCP connections
 func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 	// Defer the cleanup
@@ -1068,6 +1237,95 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vnode.Host, body.Vnode.String())
 			}
+
+
+		case tcpRLockReq:
+			body := tcpBodyLMRLockReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyLMRLockResp{}
+			sendResp = &resp
+			if ok {
+				lockId, version, err :=
+					obj.RLock(body.Key, body.SenderID)
+
+				resp.Err = err
+                resp.LockId = lockId
+                resp.Version = version
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpWLockReq:
+			body := tcpBodyLMWLockReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyLMWLockResp{}
+			sendResp = &resp
+			if ok {
+				lockId, version, timeout, err :=
+					obj.WLock(body.Key, body.Version, body.Timeout, body.SenderID)
+
+				resp.Err = err
+                resp.LockId = lockId
+                resp.Version = version
+                resp.Timeout = timeout
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpCommitWLockReq:
+			body := tcpBodyLMCommitWLockReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyLMCommitWLockResp{}
+			sendResp = &resp
+			if ok {
+				err :=
+					obj.CommitWLock(body.Key, body.Version, body.SenderID)
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpAbortWLockReq:
+			body := tcpBodyLMAbortWLockReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyLMAbortWLockResp{}
+			sendResp = &resp
+			if ok {
+				err :=
+					obj.AbortWLock(body.Key, body.Version, body.SenderID)
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
 
 		default:
 			log.Printf("[ERR] Unknown request type! Got %d", header.ReqType)

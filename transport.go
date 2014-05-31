@@ -168,6 +168,24 @@ func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (str
 	return lockID, version, err
 }
 
+func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	lmVnodeRpc, _ := lt.get(targetLm)
+	lockID, version, timeout, err := lmVnodeRpc.WLock(key, version, timeout, nodeID)
+	return lockID, version, timeout, err
+}
+
+func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
+	lmVnodeRpc, _ := lt.get(targetLm)
+	err := lmVnodeRpc.CommitWLock(key, version, nodeID)
+	return err
+}
+
+func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
+	lmVnodeRpc, _ := lt.get(targetLm)
+	err := lmVnodeRpc.AbortWLock(key, version, nodeID)
+	return err
+}
+
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {
@@ -206,4 +224,16 @@ func (*BlackholeTransport) Register(v *Vnode, o VnodeRPC) {
 
 func (*BlackholeTransport) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
 	return "", 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	return "", 0, 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) CommitWLock(v *Vnode, key string, version uint, nodeID string) error {
+	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID string) error {
+	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }

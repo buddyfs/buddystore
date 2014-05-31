@@ -10,6 +10,7 @@ import (
 var PORT uint = 9000
 
 func TestRLockTCP(t *testing.T) {
+	TEST_KEY := "test_key"
 	conf := fastConf()
 	numGo := runtime.NumGoroutine()
 
@@ -23,7 +24,15 @@ func TestRLockTCP(t *testing.T) {
 
 	//  We have a Ring with TCPTransport. Create a LockManager using this ring
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	retVersion, err := lm.RLock("test_key", false)
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	if err != nil {
+		t.Fatalf("Error while getting write lock : ", err)
+	}
+	err := lm.CommitWLock(TEST_KEY, 1)
+	if err != nil {
+		t.Fatalf("Error while committing the write locked key")
+	}
+	retVersion, err := lm.RLock(TEST_KEY, false)
 	if err != nil {
 		t.Fatalf("Error while getting Read Lock ", err)
 	}

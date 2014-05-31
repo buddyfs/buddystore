@@ -39,6 +39,16 @@ type Transport interface {
 
 	//  Method to create the request message for RLock from client
 	RLock(*Vnode, string, string) (string, uint, error)
+
+	//  Method to create the request message for WLock from client
+	// TODO : Discuss : For WriteLocks the server doesn't need to remember to whom it gave the lock?
+	WLock(*Vnode, string, uint, uint, string) (string, uint, uint, error)
+
+	//  Method to commit a write
+	CommitWLock(*Vnode, string, uint, string) error
+
+	//  Method to abort a write
+	AbortWLock(*Vnode, string, uint, string) error
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -54,6 +64,9 @@ type VnodeRPC interface {
 	DHTSet(ringId string, key string, value []byte) error
 	DHTList(ringId string) ([]string, error)
 	RLock(key string, nodeID string) (string, uint, error)
+	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
+	CommitWLock(key string, version uint, nodeID string) error
+	AbortWLock(key string, version uint, nodeID string) error
 }
 
 // Delegate to notify on ring events

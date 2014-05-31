@@ -359,7 +359,22 @@ func (vn *localVnode) knownSuccessors() (successors int) {
 Vnode RPC implementation for localNode
 */
 func (vn *localVnode) RLock(key string, nodeID string) (string, uint, error) {
-	//  TODO : Do exactly what you do on the TCP server implementation using the Vnode vn. Get the LM instance from the localVnode and call createRLock
+	//  TODO : Do exactly this on the TCP server implementation using the Vnode vn. Get the LM instance from the localVnode and call createRLock
 	lockID, version, err := vn.lm.createRLock(key, nodeID)
 	return lockID, version, err
+}
+
+func (vn *localVnode) WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	lockID, version, timeout, err := vn.lm.createWLock(key, version, timeout, nodeID)
+	return lockID, version, timeout, err
+}
+
+func (vn *localVnode) CommitWLock(key string, version uint, nodeID string) error {
+	err := vn.lm.commitWLock(key, version, nodeID)
+	return err
+}
+
+func (vn *localVnode) AbortWLock(key string, version uint, nodeID string) error {
+	err := vn.lm.abortWLock(key, version, nodeID)
+	return err
 }

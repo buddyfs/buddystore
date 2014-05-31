@@ -16,34 +16,35 @@ type tcpBodyLMWLockReq struct {
 	Vn       *Vnode
 	SenderID string
 	Key      string
-	Version  int
+	Version  uint
 	Timeout  uint
 }
 
 type tcpBodyLMWLockResp struct {
 	LockId  string
+    Version uint
 	Timeout uint
 	Err     error
 }
 
-type tcpBodyCommitWLockReq struct {
-	Vn       *Vnode
-	SenderID string
-	Key      string
-	Version  int
-}
-
-type tcpBodyCommitWLockResp struct {
-	Err error
-}
-
-type tcpBodyAbortWLockReq struct {
+type tcpBodyLMCommitWLockReq struct {
 	Vn       *Vnode
 	SenderID string
 	Key      string
 	Version  uint
 }
 
-type tcpBodyAbortWLockResp struct {
+type tcpBodyLMCommitWLockResp struct {
+	Err error
+}
+
+type tcpBodyLMAbortWLockReq struct {
+	Vn       *Vnode
+	SenderID string
+	Key      string
+	Version  uint
+}
+
+type tcpBodyLMAbortWLockResp struct {
 	Err error
 }

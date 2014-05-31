@@ -90,7 +90,19 @@ func (ml *MultiLocalTrans) Deregister(host string) {
 
 func (ml *MultiLocalTrans) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
 	//  TODO : Are we going to use this transport. Placeholder
-	return "", 0, fmt.Errorf("MultiLocalTransport not implemented yet")
+	return "", 0, fmt.Errorf("RLock in MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	return "", 0, 0, fmt.Errorf("WLock in MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) CommitWLock(v *Vnode, key string, version uint) error {
+	return fmt.Errorf("CommitWLock in MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) AbortWLock(v *Vnode, key string, version uint) error {
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
 func TestDefaultConfig(t *testing.T) {

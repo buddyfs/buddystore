@@ -53,6 +53,17 @@ func (mv *MockVnodeRPC) RLock(key string, nodeID string) (string, uint, error) {
 	return "", 0, nil
 }
 
+func (mv *MockVnodeRPC) WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	return "", 0, 0, nil
+}
+
+func (mv *MockVnodeRPC) CommitWLock(key string, version uint) error {
+	return nil
+}
+
+func (mv *MockVnodeRPC) AbortWLock(key string, version uint) error {
+	return nil
+}
 func makeLocal() *LocalTransport {
 	return InitLocalTransport(nil).(*LocalTransport)
 }
