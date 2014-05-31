@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-    "time"
-    "sync"
+	"sync"
+	"time"
 )
 
 /*
@@ -29,9 +29,9 @@ type LManager struct {
 	VersionMap map[string]uint        //  key-version mappings. A map of key to the corresponding version
 	RLocks     map[string]*RLockEntry // Will have the nodeSets for whom the RLocks have been provided for a key
 	WLocks     map[string]*WLockEntry // Will have mapping from key to the metadata to be maintained
-    wLockMut    sync.Mutex              // Lock for synchronizing access to WLocks
+	wLockMut   sync.Mutex             // Lock for synchronizing access to WLocks
 
-    TimeoutTicker   *time.Ticker         // Ticker that will periodically check WLocks for invalidation
+	TimeoutTicker *time.Ticker // Ticker that will periodically check WLocks for invalidation
 
 }
 
@@ -47,26 +47,26 @@ type LManagerIntf interface {
 /*
 Creates a new Ticker which checks the existing WLocks every 500 Milliseconds */
 func (lm *LManager) scheduleTimeoutTicker() {
-    lm.TimeoutTicker = time.NewTicker(500 * time.Millisecond)
-    quit := make(chan struct{})
-    go func() {
-        for {
-            select {
-            case <- lm.TimeoutTicker.C:
-                lm.wLockMut.Lock()
-                t := time.Now().UTC()
-                for k,v := range lm.WLocks {
-                    if v.timeout.Before(t) || v.timeout.Equal(t) {
-                        delete(lm.WLocks, k)
-                    }
-                }
-                lm.wLockMut.Unlock()
-            case <- quit:
-                lm.TimeoutTicker.Stop()
-                return
-            }
-        }
-    }() 
+	lm.TimeoutTicker = time.NewTicker(500 * time.Millisecond)
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-lm.TimeoutTicker.C:
+				lm.wLockMut.Lock()
+				t := time.Now().UTC()
+				for k, v := range lm.WLocks {
+					if v.timeout.Before(t) || v.timeout.Equal(t) {
+						delete(lm.WLocks, k)
+					}
+				}
+				lm.wLockMut.Unlock()
+			case <-quit:
+				lm.TimeoutTicker.Stop()
+				return
+			}
+		}
+	}()
 }
 
 /* LockID generator : 20 bits from crypto rand */
@@ -132,9 +132,9 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 		lm.WLocks = make(map[string]*WLockEntry)
 	}
 
-    if lm.TimeoutTicker == nil {
-       lm.scheduleTimeoutTicker() 
-    }
+	if lm.TimeoutTicker == nil {
+		lm.scheduleTimeoutTicker()
+	}
 
 	present, _, err := lm.checkWLock(key)
 	if err != nil {
@@ -153,11 +153,11 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 	if err != nil {
 		return "", 0, 0, err
 	}
-    t := time.Now().UTC()
-    t = t.Add(time.Duration(timeout)*time.Second)
-    lm.wLockMut.Lock()
+	t := time.Now().UTC()
+	t = t.Add(time.Duration(timeout) * time.Second)
+	lm.wLockMut.Lock()
 	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: t}
-    lm.wLockMut.Unlock()
+	lm.wLockMut.Unlock()
 	return lockID, version, timeout, nil
 }
 
@@ -181,9 +181,9 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 		lm.VersionMap = make(map[string]uint)
 	}
 	lm.VersionMap[key] = version
-    lm.wLockMut.Lock()
+	lm.wLockMut.Lock()
 	delete(lm.WLocks, key)
-    lm.wLockMut.Unlock()
+	lm.wLockMut.Unlock()
 
 	/*TODO : Notifying nodeset */
 
@@ -202,8 +202,8 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string) error {
 		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot abort")
 	}
 
-    lm.wLockMut.Lock()
+	lm.wLockMut.Lock()
 	delete(lm.WLocks, key)
-    lm.wLockMut.Unlock()
+	lm.wLockMut.Unlock()
 	return nil
 }
