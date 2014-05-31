@@ -56,15 +56,30 @@ Then based on the request that comes in, the server should be able to delegate t
 
 */
 func (lm *LManager) createRLock(key string, nodeID string) (string, uint, error) {
+
 	version := lm.VersionMap[key]
 	if version == 0 {
 		return "", 0, fmt.Errorf("ReadLock not possible. Key not present in LM")
 	}
-	rLockEntry := lm.RLocks[key]
+
 	lockID, err := getLockID()
 	if err != nil {
 		return "", 0, err
 	}
+
+	if lm.RLocks == nil {
+		lm.RLocks = make(map[string]*RLockEntry)
+	}
+
+	if lm.RLocks[key] == nil {
+		lm.RLocks[key] = &RLockEntry{}
+	}
+	rLockEntry := lm.RLocks[key]
+
+	if rLockEntry.nodeSet == nil {
+		rLockEntry.nodeSet = make(map[string]string)
+	}
+
 	rLockEntry.nodeSet[nodeID] = lockID // Added the nodeID to the nodeSet for the given key
 	return lockID, lm.VersionMap[key], nil
 }
@@ -82,6 +97,10 @@ func (lm *LManager) checkWLock(key string) (bool, uint, error) {
 TODO : Discuss : If Wlock exists then it will give back the version that is currently being written, not the committed version
 */
 func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+	if lm.WLocks == nil {
+		lm.WLocks = make(map[string]*WLockEntry)
+	}
+
 	present, _, err := lm.checkWLock(key)
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("Error while checking if a write lock exists already for that key")
@@ -119,6 +138,9 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	}
 
 	/*TODO Wait until the backup LMs also perform the same operation and then commit it */
+	if lm.VersionMap == nil {
+		lm.VersionMap = make(map[string]uint)
+	}
 	lm.VersionMap[key] = version
 	delete(lm.WLocks, key)
 

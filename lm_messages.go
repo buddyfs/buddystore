@@ -22,7 +22,7 @@ type tcpBodyLMWLockReq struct {
 
 type tcpBodyLMWLockResp struct {
 	LockId  string
-    Version uint
+	Version uint
 	Timeout uint
 	Err     error
 }

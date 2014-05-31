@@ -876,7 +876,7 @@ func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout ui
 	go func() {
 		// Send a list command
 		out.header.ReqType = tcpWLockReq
-        body := tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}
+		body := tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -931,7 +931,7 @@ func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, node
 	go func() {
 		// Send a list command
 		out.header.ReqType = tcpCommitWLockReq
-        body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+		body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -985,7 +985,7 @@ func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeI
 	go func() {
 		// Send a list command
 		out.header.ReqType = tcpAbortWLockReq
-        body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+		body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -1238,7 +1238,6 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					body.Vnode.Host, body.Vnode.String())
 			}
 
-
 		case tcpRLockReq:
 			body := tcpBodyLMRLockReq{}
 			if err := dec.Decode(&body); err != nil {
@@ -1255,8 +1254,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					obj.RLock(body.Key, body.SenderID)
 
 				resp.Err = err
-                resp.LockId = lockId
-                resp.Version = version
+				resp.LockId = lockId
+				resp.Version = version
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())
@@ -1278,9 +1277,9 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					obj.WLock(body.Key, body.Version, body.Timeout, body.SenderID)
 
 				resp.Err = err
-                resp.LockId = lockId
-                resp.Version = version
-                resp.Timeout = timeout
+				resp.LockId = lockId
+				resp.Version = version
+				resp.Timeout = timeout
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())
@@ -1325,7 +1324,6 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())
 			}
-
 
 		default:
 			log.Printf("[ERR] Unknown request type! Got %d", header.ReqType)
