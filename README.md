@@ -1,6 +1,6 @@
 # Go Chord
 
-[![Build Status](https://drone.io/github.com/narendran/go-chord/status.png)](https://drone.io/github.com/narendran/go-chord/latest) [![Coverage Status](https://coveralls.io/repos/narendran/go-chord/badge.png)](https://coveralls.io/r/narendran/go-chord)
+[![Build Status](https://drone.io/github.com/buddyfs/buddystore/status.png)](https://drone.io/github.com/buddyfs/buddystore/latest) [![Coverage Status](https://coveralls.io/repos/buddyfs/buddystore/badge.png)](https://coveralls.io/r/buddyfs/buddystore)
 
 This package provides a Golang implementation of the Chord protocol.
 Chord is used to organize nodes along a ring in a consistent way. It can be
