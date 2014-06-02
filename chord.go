@@ -70,7 +70,7 @@ type VnodeRPC interface {
 	List() ([]string, error)
 
 	// Lock Manager operations
-	RLock(key string, nodeID string) (string, uint, error)
+	RLock(key string, nodeID string, remoteAddr string) (string, uint, error)
 	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
@@ -114,8 +114,8 @@ type localVnode struct {
 	predecessor *Vnode
 	stabilized  time.Time
 	timer       *time.Timer
-	lm          LManager
-	store       *KVStore
+    store       *KVStore
+	lm    *LManager
 }
 
 // Stores the state required for a Chord ring

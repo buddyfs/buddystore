@@ -49,7 +49,7 @@ func (mv *MockVnodeRPC) List() ([]string, error) {
 	return nil, nil
 }
 
-func (mv *MockVnodeRPC) RLock(key string, nodeID string) (string, uint, error) {
+func (mv *MockVnodeRPC) RLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
 	return "", 0, nil
 }
 

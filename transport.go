@@ -167,11 +167,12 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 
 func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (string, uint, error) {
 	lmVnodeRpc, _ := lt.get(targetLm)
-	lockID, version, err := lmVnodeRpc.RLock(key, nodeID)
+	lockID, version, err := lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
 	return lockID, version, err
 }
 
 func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+    fmt.Println("*** INSIDE WLock of LocalTrasport ***", targetLm)
 	lmVnodeRpc, _ := lt.get(targetLm)
 	lockID, version, timeout, err := lmVnodeRpc.WLock(key, version, timeout, nodeID)
 	return lockID, version, timeout, err

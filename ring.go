@@ -16,6 +16,8 @@ func (r *Ring) init(conf *Config, trans Transport) {
 	// Initializes the vnodes
 	for i := 0; i < conf.NumVnodes; i++ {
 		vn := &localVnode{}
+		vn.lm = &LManager{}
+		vn.lm.Ring = r
 		r.vnodes[i] = vn
 		vn.ring = r
 		vn.init(i)
