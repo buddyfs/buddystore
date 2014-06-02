@@ -51,11 +51,10 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
-	// Now that we have a version number and list of successors, chose any successor
-	// and "Get" the value.
-	// TODO: Make a call to the server now
-	glog.Infoln(v)
-	return nil, nil
+	value, err := kv.ring.transport.Get(succVnodes[0], key, v)
+
+	// TODO: Should we retry this call if there is an error?
+	return value, err
 }
 
 /* Get the public key from .ssh folder and start SET RPC */

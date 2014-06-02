@@ -51,8 +51,8 @@ type Transport interface {
 	AbortWLock(*Vnode, string, uint, string) error
 
 	// KV Store operations
-	Get(target *Vnode, key string) ([]byte, error)
-	Set(target *Vnode, key string, value []byte) error
+	Get(target *Vnode, key string, version uint) ([]byte, error)
+	Set(target *Vnode, key string, version uint, value []byte) error
 	List(target *Vnode) ([]string, error)
 }
 

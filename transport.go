@@ -19,6 +19,9 @@ type LocalTransport struct {
 	remote Transport
 	lock   sync.RWMutex
 	local  map[string]*localRPC
+
+	// Implements:
+	Transport
 }
 
 // Creates a local transport to wrap a remote transport
@@ -186,11 +189,11 @@ func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, 
 	return err
 }
 
-func (lt *LocalTransport) Get(target *Vnode, key string) ([]byte, error) {
+func (lt *LocalTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
 	return nil, nil
 }
 
-func (lt *LocalTransport) Set(target *Vnode, key string, value []byte) error {
+func (lt *LocalTransport) Set(target *Vnode, key string, version uint, value []byte) error {
 	return nil
 }
 
@@ -201,6 +204,8 @@ func (lt *LocalTransport) List(target *Vnode) ([]string, error) {
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {
+	// Implements:
+	Transport
 }
 
 func (*BlackholeTransport) ListVnodes(host string) ([]*Vnode, error) {
@@ -250,11 +255,11 @@ func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) Get(target *Vnode, key string) ([]byte, error) {
+func (*BlackholeTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
 	return nil, nil
 }
 
-func (*BlackholeTransport) Set(target *Vnode, key string, value []byte) error {
+func (*BlackholeTransport) Set(target *Vnode, key string, version uint, value []byte) error {
 	return nil
 }
 

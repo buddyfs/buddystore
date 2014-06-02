@@ -24,7 +24,7 @@ type LManagerClient struct {
 }
 
 type LMClientIntf interface {
-	RLock(key string) (int, error)
+	RLock(key string) (uint, error)
 	WLock(key string, version uint, timeout uint) (uint, error)
 	CommitWLock(key string, version uint) error
 	AbortWLock(key string, version uint)

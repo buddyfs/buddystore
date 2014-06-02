@@ -30,7 +30,12 @@ type TCPTransport struct {
 	poolLock sync.Mutex
 	pool     map[string][]*tcpOutConn
 	shutdown int32
+
+	// Implements:
+	Transport
 }
+
+var _ Transport = new(TCPTransport)
 
 type tcpOutConn struct {
 	host   string
@@ -459,7 +464,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 /* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) Get(target *Vnode, key string) ([]byte, error) {
+func (t *TCPTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -511,7 +516,7 @@ func (t *TCPTransport) Get(target *Vnode, key string) ([]byte, error) {
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) Set(target *Vnode, key string, value []byte) error {
+func (t *TCPTransport) Set(target *Vnode, key string, version uint, value []byte) error {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
