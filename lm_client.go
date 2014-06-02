@@ -21,13 +21,18 @@ type LManagerClient struct {
 	Ring   *Ring                // Ring with whom the client is associated with
 	RLocks map[string]*RLockVal //  Map of <keys, ReadLock Values>
 	WLocks map[string]*WLockVal //  Map of <keys, WriteLock Values>
+
+	// Implements:
+	LMClientIntf
 }
 
+var _ LMClientIntf = new(LManagerClient)
+
 type LMClientIntf interface {
-	RLock(key string) (uint, error)
+	RLock(key string, forceNoCache bool) (uint, error)
 	WLock(key string, version uint, timeout uint) (uint, error)
 	CommitWLock(key string, version uint) error
-	AbortWLock(key string, version uint)
+	AbortWLock(key string, version uint) error
 }
 
 func (lm *LManagerClient) getLManagerReplicas() ([]*Vnode, error) {
