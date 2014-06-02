@@ -1,7 +1,7 @@
 package chord
 
 import (
-	"fmt"
+	"sync"
 
 	"github.com/golang/glog"
 )
@@ -12,7 +12,7 @@ type KVStoreClient interface {
 }
 
 type KVStoreClientImpl struct {
-	ring Ring
+	ring *Ring
 	lm   LMClientIntf
 
 	// Implements
@@ -20,6 +20,10 @@ type KVStoreClientImpl struct {
 }
 
 var _ KVStoreClient = &KVStoreClientImpl{}
+
+func NewKVStoreClient(ring *Ring, lm LMClientIntf) *KVStoreClientImpl {
+	return &KVStoreClientImpl{ring: ring, lm: lm}
+}
 
 /*
  * Basic KV store Get operation
@@ -33,7 +37,7 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 	 *   - Network failure     => Retryable failure
 	 *   - Key does not exist  => Fail immediately
 	 */
-	v, err := kv.lm.RLock(key)
+	v, err := kv.lm.RLock(key, false)
 
 	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
@@ -57,20 +61,88 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 	return value, err
 }
 
-/* Get the public key from .ssh folder and start SET RPC */
+/*
+ * Basic KV store Set operation
+ * TODO: Improve Godoc
+ */
 func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
-	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
+	/*
+	 * Inform the lock manager we're interested in setting the value for key.
+	 * Expected return value: next available version number to write value to.
+	 * Expected error conditions:
+	 *   - Network failure     => Retryable failure
+	 *   - Key does not exist  => Fail immediately
+	 *   - Access permissions? => Fail immediately
+	 */
+	v, err := kv.lm.WLock(key, 1, 10)
+
+	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
-		fmt.Println(err)
+		glog.Errorf("Error acquiring WLock in Set(%q): %q", key, err)
+		return err
 	}
 
-	fmt.Print(succVnodes)
-	//  errDhtSet := kv.ring.transport.DHTSet(succVnodes[0], "abcd", key, value)
-	//  return errDhtSet
-	return nil
+	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
+	if err != nil {
+		glog.Errorf("Error listing successors in Set(%q): %q", key, err)
+		return err
+	}
+
+	if glog.V(2) {
+		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
+	}
+
+	var maxParallelism int = 4
+	var errs []error = make([]error, len(succVnodes))
+	var tokens chan bool = make(chan bool, maxParallelism)
+	var wg sync.WaitGroup
+
+	for i := 0; i < maxParallelism; i++ {
+		tokens <- true
+	}
+
+	writeToReplica := func(node *Vnode, err *error, wg *sync.WaitGroup, tokens chan bool) {
+		// Take a token
+		<-tokens
+
+		// Perform the operation
+		*err = kv.ring.transport.Set(node, key, v, value)
+
+		// Return the token
+		tokens <- true
+
+		// Signal completion
+		wg.Done()
+	}
+
+	for i := range succVnodes {
+		wg.Add(1)
+		go writeToReplica(succVnodes[i], &errs[i], &wg, tokens)
+	}
+
+	wg.Wait()
+
+	// Potential optimizations:
+	// - Fail fast => in case one of the replicas failed to write,
+	//                abort other threads and abort commit.
+
+	for i := range succVnodes {
+		if errs[i] != nil {
+			glog.Errorf("Aborting Set(%q, %d) due to error: %q", key, v, errs[i])
+
+			// Best-effort Abort
+			kv.lm.AbortWLock(key, v)
+
+			// Even if the Abort command failed, we can safely return
+			// because the lock manager will timeout and abort for us.
+			return errs[i]
+		}
+	}
+
+	err = kv.lm.CommitWLock(key, v)
+	return err
 }
 
-/* Get the public key from .ssh folder and start LIST RPC */
 func (kv *KVStoreClientImpl) List() ([]string, error) {
 	// Will be used only by the replicators
 	return nil, nil
