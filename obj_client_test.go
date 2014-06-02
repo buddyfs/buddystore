@@ -15,8 +15,7 @@ func TestKVGet(t *testing.T) {
 	var conf *Config = fastConf()
 	r, _ := Create(conf, trans)
 
-	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	kvsClient := NewKVStoreClient(r, lm)
+	kvsClient := NewKVStoreClient(r)
 	v, err := kvsClient.Get(TEST_KEY)
 
 	assert.Nil(t, v, "Expecting nil value for non-existent key")
@@ -31,8 +30,7 @@ func TestKVSet(t *testing.T) {
 	var conf *Config = fastConf()
 	r, _ := Create(conf, trans)
 
-	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	kvsClient := NewKVStoreClient(r, lm)
+	kvsClient := NewKVStoreClient(r)
 
 	err := kvsClient.Set(TEST_KEY, []byte("bar"))
 	assert.NoError(t, err, "Writing to new key should have no failures")

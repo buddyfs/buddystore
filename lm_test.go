@@ -124,6 +124,10 @@ func TestReadLockCached(t *testing.T) {
 }
 
 func TestWLockTimeTicker(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var listen string = fmt.Sprintf("localhost:%d", PORT+5)
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()

@@ -21,7 +21,8 @@ type KVStoreClientImpl struct {
 
 var _ KVStoreClient = &KVStoreClientImpl{}
 
-func NewKVStoreClient(ring *Ring, lm LMClientIntf) *KVStoreClientImpl {
+func NewKVStoreClient(ring *Ring) *KVStoreClientImpl {
+	lm := &LManagerClient{Ring: ring, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	return &KVStoreClientImpl{ring: ring, lm: lm}
 }
 
@@ -78,7 +79,7 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 
 	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
-		glog.Errorf("Error acquiring WLock in Set(%q): %q", key, err)
+		glog.Errorf("Error acquiring WLock in Set(%q): %d, %q", key, v, err)
 		return err
 	}
 

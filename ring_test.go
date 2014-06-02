@@ -113,6 +113,10 @@ func TestRingNearest(t *testing.T) {
 }
 
 func TestRingSchedule(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	ring := makeRing()
 	ring.setLocalSuccessors()
 	ring.schedule()
