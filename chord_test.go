@@ -14,16 +14,16 @@ type MultiLocalTrans struct {
 
 func InitMLTransport(listen string, timeout *time.Duration) *MultiLocalTrans {
 	hosts := make(map[string]*LocalTransport)
-    var remote Transport
-    var err error
-    if listen == "" && timeout == nil {
-        remote = &BlackholeTransport{}
-    } else {
-        remote, err = InitTCPTransport(listen, *timeout)
-        if err != nil {
-            return nil
-        }
-    }
+	var remote Transport
+	var err error
+	if listen == "" && timeout == nil {
+		remote = &BlackholeTransport{}
+	} else {
+		remote, err = InitTCPTransport(listen, *timeout)
+		if err != nil {
+			return nil
+		}
+	}
 	ml := &MultiLocalTrans{hosts: hosts}
 	ml.remote = remote
 	return ml
@@ -179,7 +179,7 @@ func TestCreateShutdown(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	// Create a multi transport
-	ml := InitMLTransport("",nil)
+	ml := InitMLTransport("", nil)
 
 	// Create the initial ring
 	conf := fastConf()
@@ -203,7 +203,7 @@ func TestJoin(t *testing.T) {
 
 func TestJoinDeadHost(t *testing.T) {
 	// Create a multi transport
-	ml := InitMLTransport("",nil)
+	ml := InitMLTransport("", nil)
 
 	// Create the initial ring
 	conf := fastConf()
@@ -215,7 +215,7 @@ func TestJoinDeadHost(t *testing.T) {
 
 func TestLeave(t *testing.T) {
 	// Create a multi transport
-	ml := InitMLTransport("",nil)
+	ml := InitMLTransport("", nil)
 
 	// Create the initial ring
 	conf := fastConf()
@@ -254,7 +254,7 @@ func TestLeave(t *testing.T) {
 
 func TestLookupBadN(t *testing.T) {
 	// Create a multi transport
-	ml := InitMLTransport("",nil)
+	ml := InitMLTransport("", nil)
 
 	// Create the initial ring
 	conf := fastConf()
@@ -271,7 +271,7 @@ func TestLookupBadN(t *testing.T) {
 
 func TestLookup(t *testing.T) {
 	// Create a multi transport
-	ml := InitMLTransport("",nil)
+	ml := InitMLTransport("", nil)
 
 	// Create the initial ring
 	conf := fastConf()

@@ -869,7 +869,7 @@ Param NodeID : NodeID of the requesting node
 */
 func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
 	// Get a conn
-    fmt.Println("*****************REACHED*************")
+	fmt.Println("*****************REACHED*************")
 	out, err := t.getConn(target.Host)
 	if err != nil {
 		return "", 0, 0, err
@@ -883,7 +883,7 @@ func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout ui
 		// Send a list command
 		out.header.ReqType = tcpWLockReq
 		body := tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}
-        fmt.Println(body)
+		fmt.Println(body)
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -1353,8 +1353,8 @@ func trimSlice(vn []*Vnode) []*Vnode {
 	// Find a non-nil index
 	idx := len(vn) - 1
 
-    fmt.Println(vn)
-    fmt.Println("Index is " , idx)
+	fmt.Println(vn)
+	fmt.Println("Index is ", idx)
 
 	for vn[idx] == nil {
 		idx--

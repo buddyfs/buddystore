@@ -145,7 +145,6 @@ func TestWLockTimeTicker(t *testing.T) {
 	r.Shutdown()
 }
 
-
 /* Remote Connection test */
 /*
 func TestJoinLock(t *testing.T) {
@@ -188,7 +187,7 @@ func TestJoinLock(t *testing.T) {
 		if readVersion != 2 {
 			t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
 		}
-	
+
 	// Shutdown
 	r.Shutdown()
 	r2.Shutdown()

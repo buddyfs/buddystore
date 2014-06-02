@@ -114,8 +114,8 @@ type localVnode struct {
 	predecessor *Vnode
 	stabilized  time.Time
 	timer       *time.Timer
-    store       *KVStore
-	lm    *LManager
+	store       *KVStore
+	lm          *LManager
 }
 
 // Stores the state required for a Chord ring
