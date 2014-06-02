@@ -29,25 +29,32 @@ type tcpBodyRespDHTKeys struct {
 
 // New Vnode operations added for supporting DHT
 
-type DHTStorage struct {
+type KVStore struct {
 	kv map[string][]byte
 }
 
-func (vn *localVnode) DHTGet(ringId string, key string) ([]byte, error) {
+func (vn *localVnode) DHTGet(key string) ([]byte, error) {
 
-	value := vn.store[ringId].kv[key]
+	value := vn.store.kv[key]
 
 	return value, nil
 }
 
-func (vn *localVnode) DHTSet(ringId string, key string, value []byte) error {
+func (vn *localVnode) DHTSet(key string, value []byte) error {
 
-	vn.store[ringId].kv[key] = value
+	/* TODO: Handle delete? */
+	vn.store.kv[key] = value
 
 	return nil
 }
 
-func (vn *localVnode) DHTList(ringId string) ([]string, error) {
+func (vn *localVnode) DHTList() ([]string, error) {
 
-	return nil, nil
+	ret := make([]string, 0, len(vn.store.kv))
+
+	for key := range vn.store.kv {
+		ret = append(ret, key)
+	}
+
+	return ret, nil
 }

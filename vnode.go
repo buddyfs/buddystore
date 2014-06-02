@@ -28,7 +28,7 @@ func (vn *localVnode) init(idx int) {
 	vn.ring.transport.Register(&vn.Vnode, vn)
 
 	// Initialise the key-value store
-	vn.store = make(map[string]*DHTStorage)
+	vn.store = &KVStore{kv: make(map[string][]byte)}
 }
 
 // Schedules the Vnode to do regular maintenence

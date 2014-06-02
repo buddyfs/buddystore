@@ -20,7 +20,7 @@ type DHTStoreIntf interface {
 }
 
 /* Get the public key from .ssh folder and start GET RPC */
-func (kv *DHTStore) DHTGet(key string) ([]byte, error) {
+func (kv *DHTStore) Get(key string) ([]byte, error) {
 	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
 	if err != nil {
 		fmt.Println(err)
@@ -28,25 +28,25 @@ func (kv *DHTStore) DHTGet(key string) ([]byte, error) {
 	}
 
 	fmt.Print(succVnodes)
-	res, errDhtGet := kv.ring.transport.DHTGet(succVnodes[0], "abcd", key)
+	res, errDhtGet := kv.ring.transport.DHTGet(succVnodes[0], key)
 	fmt.Println(res)
-	return res, nil
+	return res, errDhtGet
 }
 
 /* Get the public key from .ssh folder and start SET RPC */
-func (kv *DHTStore) DHTSet(key string, value []byte) error {
+func (kv *DHTStore) Set(key string, value []byte) error {
 	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	fmt.Print(succVnodes)
-	errDhtSet := kv.ring.transport.DHTSet(succVnodes[0], "abcd", key, value)
+	errDhtSet := kv.ring.transport.DHTSet(succVnodes[0], key, value)
 	return errDhtSet
 }
 
 /* Get the public key from .ssh folder and start LIST RPC */
-func (kv *DHTStore) List(ringId string) error {
+func (kv *DHTStore) List() error {
 	// Will be used only by the replicators
 	return nil
 }

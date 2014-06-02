@@ -455,7 +455,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 /* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *Transport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
+func (t *TCPTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -468,7 +468,7 @@ func (t *Transport) DHTGet(target *Vnode, ringId string, key string) ([]byte, er
 	resp := tcpBodyRespDHTValue{}
 	go func() {
 		out.header.ReqType = tcpDHTGet
-		body := tcpBodyDHTGet{RingId: ringId, Vnode: target, Key: key}
+		body := tcpBodyDHTGet{Vnode: target, Key: key}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -507,7 +507,7 @@ func (t *Transport) DHTGet(target *Vnode, ringId string, key string) ([]byte, er
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *Transport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
+func (t *TCPTransport) DHTSet(target *Vnode, key string, value []byte) error {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -525,7 +525,7 @@ func (t *Transport) DHTSet(target *Vnode, ringId string, key string, value []byt
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTSet{RingId: ringId, Vnode: target, Key: key, Value: value}
+		body := tcpBodyDHTSet{Vnode: target, Key: key, Value: value}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -560,7 +560,7 @@ func (t *Transport) DHTSet(target *Vnode, ringId string, key string, value []byt
 /* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
-func (t *Transport) DHTList(target *Vnode, ringId string) ([]string, error) {
+func (t *TCPTransport) DHTList(target *Vnode) ([]string, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -578,7 +578,7 @@ func (t *Transport) DHTList(target *Vnode, ringId string) ([]string, error) {
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTList{RingId: ringId, Vnode: target}
+		body := tcpBodyDHTList{Vnode: target}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -965,7 +965,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-				value, err := obj.DHTGet(body.RingId, body.Key)
+				value, err := obj.DHTGet(body.Key)
 				resp.Value = value
 				resp.Err = err
 			} else {
@@ -985,8 +985,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				err :=
-					obj.DHTSet(body.RingId, body.Key, body.Value)
+				err := obj.DHTSet(body.Key, body.Value)
 
 				resp.Err = err
 			} else {
@@ -1006,7 +1005,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTKeys{}
 			sendResp = &resp
 			if ok {
-				keys, err := obj.DHTList(body.RingId)
+				keys, err := obj.DHTList()
 				resp.Keys = keys
 				resp.Err = err
 			} else {
