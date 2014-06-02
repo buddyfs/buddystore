@@ -172,7 +172,6 @@ func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (str
 }
 
 func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	fmt.Println("*** INSIDE WLock of LocalTrasport ***", targetLm)
 	lmVnodeRpc, _ := lt.get(targetLm)
 	lockID, version, timeout, err := lmVnodeRpc.WLock(key, version, timeout, nodeID)
 	return lockID, version, timeout, err

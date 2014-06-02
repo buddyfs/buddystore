@@ -60,7 +60,6 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 		}
 	}
 	LMVnodes, err := lm.getLManagerReplicas()
-	fmt.Println("LockManager Replicas : ", LMVnodes)
 	if err != nil {
 		return 0, err
 	}
@@ -74,14 +73,11 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 }
 
 func (lm *LManagerClient) WLock(key string, version uint, timeout uint) (uint, error) {
-	fmt.Println("********* Getting Manager replicas ************")
 	LMVnodes, err := lm.getLManagerReplicas()
 	if err != nil {
 		return 0, err
 	}
 
-	fmt.Println("LockManager Replicas : ", LMVnodes)
-	fmt.Println("Current Lock_Manager : ", LMVnodes[0])
 
 	retLockID, ver, timeout, err := lm.Ring.transport.WLock(LMVnodes[0], key, version, timeout, "testNodeId")
 	if err != nil {
