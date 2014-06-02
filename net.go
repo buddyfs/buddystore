@@ -459,7 +459,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 /* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte, error) {
+func (t *TCPTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -511,7 +511,7 @@ func (t *TCPTransport) DHTGet(target *Vnode, ringId string, key string) ([]byte,
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []byte) error {
+func (t *TCPTransport) DHTSet(target *Vnode, key string, value []byte) error {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -564,7 +564,7 @@ func (t *TCPTransport) DHTSet(target *Vnode, ringId string, key string, value []
 /* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTList(target *Vnode, ringId string) ([]string, error) {
+func (t *TCPTransport) DHTList(target *Vnode) ([]string, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -1189,7 +1189,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-				value, err := obj.DHTGet(string(body.Vnode.Id[:]), body.Key)
+				value, err := obj.DHTGet(body.Key)
 				resp.Value = value
 				resp.Err = err
 			} else {
@@ -1209,8 +1209,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				err :=
-					obj.DHTSet(string(body.Vnode.Id[:]), body.Key, body.Value)
+				err := obj.DHTSet(body.Key, body.Value)
 
 				resp.Err = err
 			} else {
@@ -1230,7 +1229,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTKeys{}
 			sendResp = &resp
 			if ok {
-				keys, err := obj.DHTList(string(body.Vnode.Id[:]))
+				keys, err := obj.DHTList()
 				resp.Keys = keys
 				resp.Err = err
 			} else {

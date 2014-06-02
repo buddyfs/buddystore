@@ -37,15 +37,15 @@ func (mv *MockVnodeRPC) SkipSuccessor(s *Vnode) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) DHTGet(ringId string, key string) ([]byte, error) {
+func (mv *MockVnodeRPC) DHTGet(key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (mv *MockVnodeRPC) DHTSet(ringId string, key string, value []byte) error {
+func (mv *MockVnodeRPC) DHTSet(key string, value []byte) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) DHTList(ringId string) ([]string, error) {
+func (mv *MockVnodeRPC) DHTList() ([]string, error) {
 	return nil, nil
 }
 

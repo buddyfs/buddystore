@@ -49,6 +49,10 @@ type Transport interface {
 
 	//  Method to abort a write
 	AbortWLock(*Vnode, string, uint, string) error
+	// KV Store operations
+	DHTGet(target *Vnode, key string) ([]byte, error)
+	DHTSet(target *Vnode, key string, value []byte) error
+	DHTList(target *Vnode) ([]string, error)
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -59,14 +63,14 @@ type VnodeRPC interface {
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
 
-	// Added for the DHT operations
-	DHTGet(ringId string, key string) ([]byte, error)
-	DHTSet(ringId string, key string, value []byte) error
-	DHTList(ringId string) ([]string, error)
 	RLock(key string, nodeID string) (string, uint, error)
 	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
+	// KV Store operations
+	DHTGet(key string) ([]byte, error)
+	DHTSet(key string, value []byte) error
+	DHTList() ([]string, error)
 }
 
 // Delegate to notify on ring events
@@ -107,12 +111,8 @@ type localVnode struct {
 	predecessor *Vnode
 	stabilized  time.Time
 	timer       *time.Timer
-	/* TODO: Make all the above fields per Ring and move 'store'
-	 * to per ring per node structure. For now having it as a map
-	 * based on ring.
-	 */
 	lm    LManager
-	store map[string]*DHTStorage
+	store       *KVStore
 }
 
 // Stores the state required for a Chord ring
@@ -135,7 +135,6 @@ func DefaultConfig(hostname string) *Config {
 		8,   // 8 successors
 		nil, // No delegate
 		160, // 160bit hash function
-		// TODO: Add the ringId
 		"",
 	}
 }
@@ -170,12 +169,6 @@ func Join(conf *Config, trans Transport, existing string) (*Ring, error) {
 	// Create a ring
 	ring := &Ring{}
 	ring.init(conf, trans)
-
-	// Create the key-value store
-	for _, vn := range ring.vnodes {
-		// TODO: ring name?
-		vn.store[conf.RingId] = &DHTStorage{}
-	}
 
 	// Acquire a live successor for each Vnode
 	for _, vn := range ring.vnodes {

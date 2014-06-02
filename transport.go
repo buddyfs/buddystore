@@ -186,6 +186,18 @@ func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, 
 	return err
 }
 
+func (lt *LocalTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
+	return nil, nil
+}
+
+func (lt *LocalTransport) DHTSet(target *Vnode, key string, value []byte) error {
+	return nil
+}
+
+func (lt *LocalTransport) DHTList(target *Vnode) ([]string, error) {
+	return nil, nil
+}
+
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {
@@ -236,4 +248,16 @@ func (*BlackholeTransport) CommitWLock(v *Vnode, key string, version uint, nodeI
 
 func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID string) error {
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
+	return nil, nil
+}
+
+func (*BlackholeTransport) DHTSet(target *Vnode, key string, value []byte) error {
+	return nil
+}
+
+func (*BlackholeTransport) DHTList(target *Vnode) ([]string, error) {
+	return nil, nil
 }

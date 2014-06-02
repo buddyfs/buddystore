@@ -105,6 +105,18 @@ func (ml *MultiLocalTrans) AbortWLock(v *Vnode, key string, version uint, nodeID
 	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
+func (ml *MultiLocalTrans) DHTGet(target *Vnode, key string) ([]byte, error) {
+	return nil, nil
+}
+
+func (ml *MultiLocalTrans) DHTSet(target *Vnode, key string, value []byte) error {
+	return nil
+}
+
+func (ml *MultiLocalTrans) DHTList(target *Vnode) ([]string, error) {
+	return nil, nil
+}
+
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig("test")
 	if conf.Hostname != "test" {
