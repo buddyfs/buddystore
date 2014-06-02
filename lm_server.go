@@ -149,7 +149,11 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 
 	//  Check if requested version is greater than the committed version
 	if version <= lm.VersionMap[key] {
-		return "", lm.VersionMap[key], 0, fmt.Errorf("Committed version is higher than requested version")
+		if version == 0 { // Client wants to update
+			version = lm.VersionMap[key] + 1
+		} else {
+			return "", lm.VersionMap[key], 0, fmt.Errorf("Committed version is higher than requested version")
+		}
 	}
 
 	lockID, err := getLockID()
