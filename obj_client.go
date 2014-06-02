@@ -75,7 +75,7 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 	 *   - Key does not exist  => Fail immediately
 	 *   - Access permissions? => Fail immediately
 	 */
-	v, err := kv.lm.WLock(key, 1, 10)
+	v, err := kv.lm.WLock(key, 0, 10)
 
 	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
