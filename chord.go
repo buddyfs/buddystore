@@ -49,10 +49,11 @@ type Transport interface {
 
 	//  Method to abort a write
 	AbortWLock(*Vnode, string, uint, string) error
+
 	// KV Store operations
-	DHTGet(target *Vnode, key string) ([]byte, error)
-	DHTSet(target *Vnode, key string, value []byte) error
-	DHTList(target *Vnode) ([]string, error)
+	Get(target *Vnode, key string) ([]byte, error)
+	Set(target *Vnode, key string, value []byte) error
+	List(target *Vnode) ([]string, error)
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -63,14 +64,16 @@ type VnodeRPC interface {
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
 
+	// KV Store operations
+	Get(key string, version uint) ([]byte, error)
+	Set(key string, version uint, value []byte) error
+	List() ([]string, error)
+
+	// Lock Manager operations
 	RLock(key string, nodeID string) (string, uint, error)
 	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
-	// KV Store operations
-	DHTGet(key string) ([]byte, error)
-	DHTSet(key string, value []byte) error
-	DHTList() ([]string, error)
 }
 
 // Delegate to notify on ring events
@@ -111,7 +114,7 @@ type localVnode struct {
 	predecessor *Vnode
 	stabilized  time.Time
 	timer       *time.Timer
-	lm    LManager
+	lm          LManager
 	store       *KVStore
 }
 

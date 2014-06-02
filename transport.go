@@ -186,15 +186,15 @@ func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, 
 	return err
 }
 
-func (lt *LocalTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
+func (lt *LocalTransport) Get(target *Vnode, key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (lt *LocalTransport) DHTSet(target *Vnode, key string, value []byte) error {
+func (lt *LocalTransport) Set(target *Vnode, key string, value []byte) error {
 	return nil
 }
 
-func (lt *LocalTransport) DHTList(target *Vnode) ([]string, error) {
+func (lt *LocalTransport) List(target *Vnode) ([]string, error) {
 	return nil, nil
 }
 
@@ -250,14 +250,14 @@ func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
+func (*BlackholeTransport) Get(target *Vnode, key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (*BlackholeTransport) DHTSet(target *Vnode, key string, value []byte) error {
+func (*BlackholeTransport) Set(target *Vnode, key string, value []byte) error {
 	return nil
 }
 
-func (*BlackholeTransport) DHTList(target *Vnode) ([]string, error) {
+func (*BlackholeTransport) List(target *Vnode) ([]string, error) {
 	return nil, nil
 }

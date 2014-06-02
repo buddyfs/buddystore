@@ -459,7 +459,7 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
 /* Transport operation that gets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
+func (t *TCPTransport) Get(target *Vnode, key string) ([]byte, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -511,7 +511,7 @@ func (t *TCPTransport) DHTGet(target *Vnode, key string) ([]byte, error) {
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTSet(target *Vnode, key string, value []byte) error {
+func (t *TCPTransport) Set(target *Vnode, key string, value []byte) error {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -564,7 +564,7 @@ func (t *TCPTransport) DHTSet(target *Vnode, key string, value []byte) error {
 /* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
-func (t *TCPTransport) DHTList(target *Vnode) ([]string, error) {
+func (t *TCPTransport) List(target *Vnode) ([]string, error) {
 	// Get a conn
 	out, err := t.getConn(target.Host)
 	if err != nil {
@@ -1189,7 +1189,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTValue{}
 			sendResp = &resp
 			if ok {
-				value, err := obj.DHTGet(body.Key)
+				value, err := obj.Get(body.Key, body.Version)
 				resp.Value = value
 				resp.Err = err
 			} else {
@@ -1209,7 +1209,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				err := obj.DHTSet(body.Key, body.Value)
+				err := obj.Set(body.Key, body.Version, body.Value)
 
 				resp.Err = err
 			} else {
@@ -1229,7 +1229,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyRespDHTKeys{}
 			sendResp = &resp
 			if ok {
-				keys, err := obj.DHTList()
+				keys, err := obj.List()
 				resp.Keys = keys
 				resp.Err = err
 			} else {

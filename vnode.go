@@ -378,3 +378,21 @@ func (vn *localVnode) AbortWLock(key string, version uint, nodeID string) error 
 	err := vn.lm.abortWLock(key, version, nodeID)
 	return err
 }
+
+func (vn *localVnode) Get(key string, version uint) ([]byte, error) {
+	panic("TODO: Hook this up with the object store server implementation")
+	// This section can look something like:
+	// return vn.ostore.get(key, version)
+}
+
+func (vn *localVnode) Set(key string, version uint, value []byte) error {
+	panic("TODO: Hook this up with the object store server implementation")
+	// This section can look something like:
+	// return vn.ostore.set(key, version, value)
+}
+
+func (vn *localVnode) List() ([]string, error) {
+	panic("TODO: Hook this up with the object store server implementation")
+	// This section can look something like:
+	// return vn.ostore.list()
+}
