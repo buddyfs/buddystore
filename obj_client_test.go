@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKVGet(t *testing.T) {
+func TestKVGetNonExistent(t *testing.T) {
 	// Setting static port numbers here leads to brittle tests.
 	// TODO: Is it possible to randomize port allocation, or use local transport?
 	var listen string = fmt.Sprintf("localhost:%d", PORT+10)
@@ -24,7 +24,7 @@ func TestKVGet(t *testing.T) {
 	r.Shutdown()
 }
 
-func TestKVSet(t *testing.T) {
+func TestKVSetNewThenGet(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+11)
 	trans, _ := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
@@ -32,8 +32,15 @@ func TestKVSet(t *testing.T) {
 
 	kvsClient := NewKVStoreClient(r)
 
-	err := kvsClient.Set(TEST_KEY, []byte("bar"))
+	bar := []byte("bar")
+
+	err := kvsClient.Set(TEST_KEY, bar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
+
+	v, err := kvsClient.Get(TEST_KEY)
+
+	assert.NoError(t, err, "Expecting no error while reading existing key")
+	assert.Equal(t, v, bar, "Sequential consistency check")
 
 	r.Shutdown()
 }

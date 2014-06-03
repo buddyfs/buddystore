@@ -42,7 +42,7 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 
 	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
-		glog.Errorf("Error acquiring RLock in Get(%q): %q", key, err)
+		glog.Errorf("Error acquiring RLock in Get(%q): %s", key, err)
 		return nil, err
 	}
 

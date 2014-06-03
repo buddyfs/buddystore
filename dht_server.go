@@ -35,23 +35,20 @@ type KVStore struct {
 	kv map[string][]byte
 }
 
-func (vn *localVnode) DHTGet(key string) ([]byte, error) {
-
+func (vn *localVnode) Get(key string, version uint) ([]byte, error) {
 	value := vn.store.kv[key]
 
 	return value, nil
 }
 
-func (vn *localVnode) DHTSet(key string, value []byte) error {
-
+func (vn *localVnode) Set(key string, version uint, value []byte) error {
 	/* TODO: Handle delete? */
 	vn.store.kv[key] = value
 
 	return nil
 }
 
-func (vn *localVnode) DHTList() ([]string, error) {
-
+func (vn *localVnode) List() ([]string, error) {
 	ret := make([]string, 0, len(vn.store.kv))
 
 	for key := range vn.store.kv {

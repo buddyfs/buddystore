@@ -190,15 +190,18 @@ func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, 
 }
 
 func (lt *LocalTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
-	return nil, nil
+	vnodeRpc, _ := lt.get(target)
+	return vnodeRpc.Get(key, version)
 }
 
 func (lt *LocalTransport) Set(target *Vnode, key string, version uint, value []byte) error {
-	return nil
+	vnodeRpc, _ := lt.get(target)
+	return vnodeRpc.Set(key, version, value)
 }
 
 func (lt *LocalTransport) List(target *Vnode) ([]string, error) {
-	return nil, nil
+	vnodeRpc, _ := lt.get(target)
+	return vnodeRpc.List()
 }
 
 // BlackholeTransport is used to provide an implemenation of the Transport that
@@ -255,14 +258,14 @@ func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
-	return nil, nil
+func (*BlackholeTransport) Get(v *Vnode, key string, version uint) ([]byte, error) {
+	return nil, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) Set(target *Vnode, key string, version uint, value []byte) error {
-	return nil
+func (*BlackholeTransport) Set(v *Vnode, key string, version uint, value []byte) error {
+	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) List(target *Vnode) ([]string, error) {
-	return nil, nil
+func (*BlackholeTransport) List(v *Vnode) ([]string, error) {
+	return nil, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
