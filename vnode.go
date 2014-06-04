@@ -1,6 +1,7 @@
 package chord
 
 import (
+	"container/list"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -28,7 +29,7 @@ func (vn *localVnode) init(idx int) {
 	vn.ring.transport.Register(&vn.Vnode, vn)
 
 	// Initialise the key-value store
-	vn.store = &KVStore{kv: make(map[string][]byte)}
+	vn.store = &KVStore{kv: make(map[string]*list.List)}
 }
 
 // Schedules the Vnode to do regular maintenence
