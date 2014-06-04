@@ -14,11 +14,20 @@ type WLockEntry struct {
 	nodeID  string
 	LockID  string
 	version uint
-	timeout time.Time
+	timeout *time.Time
 }
 
 type RLockEntry struct {
 	nodeSet map[string][]string //  For each key, there will be a list of nodes and corresponding LockIDs given out. Used during invalidation
+}
+
+/* Struct for the Log used for Lock state replication */
+type OpsLogEntry struct {
+    OpNum   uint64   //  Operation Number
+    Op   string  //  Operation that was performed
+    Key string  //  Key on which the operation was performed
+    Version uint    //  Version number of the Key
+    Timeout *time.Time   // Timeout setting if any. For instance, WLocks have timeouts associated with them. When the primary fails, the second should know when to invalidate that entry
 }
 
 //  In-memory implementation of LockManager that implements LManagerIntf
@@ -33,6 +42,10 @@ type LManager struct {
 	wLockMut   sync.Mutex             // Lock for synchronizing access to WLocks
 
 	TimeoutTicker *time.Ticker // Ticker that will periodically check WLocks for invalidation
+
+    currOpNum   uint64  // Current Operation Number
+    OpsLog  []*OpsLogEntry   //  Actual log used for write-ahead logging each operation
+    opsLogMut   sync.Mutex  //  Lock for synchronizing access to the OpsLog
 
 }
 
@@ -162,8 +175,13 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 	}
 	t := time.Now().UTC()
 	t = t.Add(time.Duration(timeout) * time.Second)
-	lm.wLockMut.Lock()
-	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: t}
+	lm.wLockMut.Lock()  
+    lm.opsLogMut.Lock()
+    lm.currOpNum ++
+    opsLogEntry := &OpsLogEntry{OpNum : lm.currOpNum, Op : "WRITE", Key: key, Version : version, Timeout: &t}
+    lm.OpsLog = append(lm.OpsLog, opsLogEntry)
+	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: &t}
+    lm.opsLogMut.Unlock()
 	lm.wLockMut.Unlock()
 	return lockID, version, timeout, nil
 }
@@ -189,7 +207,12 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	}
 	lm.VersionMap[key] = version
 	lm.wLockMut.Lock()
+    lm.opsLogMut.Lock()
+    lm.currOpNum ++
+    opsLogEntry := &OpsLogEntry{OpNum : lm.currOpNum, Op : "COMMIT", Key: key, Version : version, Timeout: nil}
+    lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 	delete(lm.WLocks, key)
+    lm.opsLogMut.Unlock()
 	lm.wLockMut.Unlock()
 
 	/*TODO : Notifying nodeset */
@@ -210,7 +233,12 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string) error {
 	}
 
 	lm.wLockMut.Lock()
+    lm.opsLogMut.Lock()
+    lm.currOpNum ++
+    opsLogEntry := &OpsLogEntry{OpNum : lm.currOpNum, Op : "ABORT", Key: key, Version : version, Timeout: nil}
+    lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 	delete(lm.WLocks, key)
+    lm.opsLogMut.Unlock()
 	lm.wLockMut.Unlock()
 	return nil
 }
