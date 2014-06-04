@@ -7,7 +7,6 @@ import (
 )
 
 /* Testing setup initializations */
-
 var PORT uint = 9000
 var TEST_KEY string = "test_key"
 var TEST_KEY_1 string = "test_key_1"
@@ -168,7 +167,7 @@ func TestWLockTimeTicker(t *testing.T) {
 		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
 	}
 	version, err = lm.WLock(TEST_KEY_1, 2, 2)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	err = lm.CommitWLock(TEST_KEY_1, version)
 	if err == nil {
 		t.Fatalf("Expected : WLock should not be committed due to timeout")
@@ -176,17 +175,24 @@ func TestWLockTimeTicker(t *testing.T) {
 	r.Shutdown()
 }
 
-/* Remote Connection test */
-/*
-func TestJoinLock(t *testing.T) {
+/* Remote Test : Create a couple of rings, try to make a Write, Commit, Read and Abort*/
+
+func TestJoinLockRemote(t *testing.T) {
 	listen1 := fmt.Sprintf("localhost:%d", PORT+7)
 	listen2 := fmt.Sprintf("localhost:%d", PORT+8)
 
-	ml1 := InitMLTransport(listen1, &timeout)
-	ml2 := InitMLTransport(listen2, &timeout)
+	t1, err1 := InitTCPTransport(listen1, timeout)
+	t2, err2 := InitTCPTransport(listen2, timeout)
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Error while trying to create TCP transports")
+	}
+
+	ml1 := InitLocalTransport(t1)
+	ml2 := InitLocalTransport(t2)
 
 	// Create the initial ring
 	conf := fastConf()
+	conf.Hostname = "localhost:9007" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
 	if err != nil {
 		t.Fatalf("unexpected err. %s", err)
@@ -194,32 +200,30 @@ func TestJoinLock(t *testing.T) {
 
 	// Create a second ring
 	conf2 := fastConf()
-	conf2.Hostname = "test2"
-	r2, err := Join(conf2, ml2, "localhost:9006")
+	conf2.Hostname = "localhost:9008" //  I know where I reside
+	r2, err := Join(conf2, ml2, conf.Hostname)
 	if err != nil {
-		t.Fatalf("failed to join local node! Got %s", err)
+		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
+	// lm is the LockManagerClient for the new combined ring
 	lm := &LManagerClient{Ring: r2, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	_, _ = lm.WLock(TEST_KEY, 1, 10)
-	/*
-	   err = lm.CommitWLock(TEST_KEY, version)
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+	readVersion, err := lm.RLock(TEST_KEY, true)
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
 
-	   readVersion, err := lm.RLock(TEST_KEY, true)
-	   if readVersion != 1 {
-	       t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
-	   }
-	   version, err = lm.WLock(TEST_KEY, 2, 10)
-	   err = lm.CommitWLock(TEST_KEY, version)
-	   readVersion, err = lm.RLock(TEST_KEY, true)
-	   if err != nil {
-	       t.Fatalf("Error while reading from Read Cache")
-	   }
-	   if readVersion != 2 {
-	       t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
-	   }
+	version, err = lm.WLock(TEST_KEY_1, 1, 10)
+	err = lm.CommitWLock(TEST_KEY_1, version)
+	readVersion, err = lm.RLock(TEST_KEY_1, true)
+	if err != nil {
+		t.Fatalf("Error while reading version 1 of key_1 from remote server")
+	}
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
 
-	// Shutdown
 	r.Shutdown()
 	r2.Shutdown()
 }
-*/

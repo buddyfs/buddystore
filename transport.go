@@ -166,27 +166,35 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 }
 
 func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (string, uint, error) {
-	lmVnodeRpc, _ := lt.get(targetLm)
-	lockID, version, err := lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
-	return lockID, version, err
+	lmVnodeRpc, ok := lt.get(targetLm)
+	if !ok {
+		return lt.remote.RLock(targetLm, key, nodeID)
+	}
+	return lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
 }
 
 func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	lmVnodeRpc, _ := lt.get(targetLm)
-	lockID, version, timeout, err := lmVnodeRpc.WLock(key, version, timeout, nodeID)
-	return lockID, version, timeout, err
+	lmVnodeRpc, ok := lt.get(targetLm)
+	if !ok {
+		return lt.remote.WLock(targetLm, key, version, timeout, nodeID)
+	}
+	return lmVnodeRpc.WLock(key, version, timeout, nodeID)
 }
 
 func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
-	lmVnodeRpc, _ := lt.get(targetLm)
-	err := lmVnodeRpc.CommitWLock(key, version, nodeID)
-	return err
+	lmVnodeRpc, ok := lt.get(targetLm)
+	if !ok {
+		return lt.remote.CommitWLock(targetLm, key, version, nodeID)
+	}
+	return lmVnodeRpc.CommitWLock(key, version, nodeID)
 }
 
 func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
-	lmVnodeRpc, _ := lt.get(targetLm)
-	err := lmVnodeRpc.AbortWLock(key, version, nodeID)
-	return err
+	lmVnodeRpc, ok := lt.get(targetLm)
+	if !ok {
+		lt.remote.AbortWLock(targetLm, key, version, nodeID)
+	}
+	return lmVnodeRpc.AbortWLock(key, version, nodeID)
 }
 
 func (lt *LocalTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
