@@ -1,4 +1,4 @@
-package chord
+package buddystore
 
 type tcpBodyLMRLockReq struct {
 	Vn       *Vnode

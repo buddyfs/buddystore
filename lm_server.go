@@ -1,4 +1,4 @@
-package chord
+package buddystore
 
 import (
 	"crypto/rand"

@@ -2,7 +2,7 @@
 This package is used to provide an implementation of the
 Chord network protocol.
 */
-package chord
+package buddystore
 
 import (
 	"crypto/sha1"
