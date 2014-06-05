@@ -54,9 +54,9 @@ const (
 	tcpFindSucReq
 	tcpClearPredReq
 	tcpSkipSucReq
-	tcpDHTGet
-	tcpDHTSet
-	tcpDHTList
+	tcpGet
+	tcpSet
+	tcpList
 	tcpRLockReq
 	tcpWLockReq
 	tcpCommitWLockReq
@@ -474,10 +474,10 @@ func (t *TCPTransport) Get(target *Vnode, key string, version uint) ([]byte, err
 	respChan := make(chan bool, 1)
 	errChan := make(chan error, 1)
 
-	resp := tcpBodyRespDHTValue{}
+	resp := tcpBodyRespValue{}
 	go func() {
-		out.header.ReqType = tcpDHTGet
-		body := tcpBodyDHTGet{Vnode: target, Key: key}
+		out.header.ReqType = tcpGet
+		body := tcpBodyGet{Vnode: target, Key: key}
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
@@ -529,12 +529,12 @@ func (t *TCPTransport) Set(target *Vnode, key string, version uint, value []byte
 	resp := tcpBodyError{}
 
 	go func() {
-		out.header.ReqType = tcpDHTSet
+		out.header.ReqType = tcpSet
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTSet{Vnode: target, Key: key, Value: value}
+		body := tcpBodySet{Vnode: target, Key: key, Value: value}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -579,15 +579,15 @@ func (t *TCPTransport) List(target *Vnode) ([]string, error) {
 	respChan := make(chan bool, 1)
 	errChan := make(chan error, 1)
 
-	resp := tcpBodyRespDHTKeys{}
+	resp := tcpBodyRespKeys{}
 
 	go func() {
-		out.header.ReqType = tcpDHTList
+		out.header.ReqType = tcpList
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
 		}
-		body := tcpBodyDHTList{Vnode: target}
+		body := tcpBodyList{Vnode: target}
 		if err := out.enc.Encode(&body); err != nil {
 			errChan <- err
 			return
@@ -1182,8 +1182,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					body.Target.Host, body.Target.String())
 			}
 
-		case tcpDHTGet:
-			body := tcpBodyDHTGet{}
+		case tcpGet:
+			body := tcpBodyGet{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
@@ -1191,7 +1191,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 
 			// Generate a response
 			obj, ok := t.get(body.Vnode)
-			resp := tcpBodyRespDHTValue{}
+			resp := tcpBodyRespValue{}
 			sendResp = &resp
 			if ok {
 				value, err := obj.Get(body.Key, body.Version)
@@ -1202,8 +1202,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					body.Vnode.Host, body.Vnode.String())
 			}
 
-		case tcpDHTSet:
-			body := tcpBodyDHTSet{}
+		case tcpSet:
+			body := tcpBodySet{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
@@ -1222,8 +1222,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 					body.Vnode.Host, body.Vnode.String())
 			}
 
-		case tcpDHTList:
-			body := tcpBodyDHTList{}
+		case tcpList:
+			body := tcpBodyList{}
 			if err := dec.Decode(&body); err != nil {
 				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
 				return
@@ -1231,7 +1231,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 
 			// Generate a response
 			obj, ok := t.get(body.Vnode)
-			resp := tcpBodyRespDHTKeys{}
+			resp := tcpBodyRespKeys{}
 			sendResp = &resp
 			if ok {
 				keys, err := obj.List()

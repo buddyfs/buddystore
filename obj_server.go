@@ -6,36 +6,36 @@ import (
 	"sync"
 )
 
-/* TCP body for DHT requests */
-type tcpBodyDHTGet struct {
+/* TCP body for KV store requests */
+type tcpBodyGet struct {
 	Vnode   *Vnode
 	Key     string
 	Version uint
 }
 
-type tcpBodyDHTSet struct {
+type tcpBodySet struct {
 	Vnode   *Vnode
 	Key     string
 	Version uint
 	Value   []byte
 }
 
-type tcpBodyDHTList struct {
+type tcpBodyList struct {
 	Vnode *Vnode
 }
 
-/* TCP body for DHT responses */
-type tcpBodyRespDHTValue struct {
+/* TCP body for KV store responses */
+type tcpBodyRespValue struct {
 	Value []byte
 	Err   error
 }
 
-type tcpBodyRespDHTKeys struct {
+type tcpBodyRespKeys struct {
 	Keys []string
 	Err  error
 }
 
-// New Vnode operations added for supporting DHT
+// New Vnode operations added for supporting KV store
 type KVStoreValue struct {
 	ver uint   // version
 	val []byte // value
