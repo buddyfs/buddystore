@@ -65,6 +65,7 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		glog.Errorf("No successors found during Lookup in Get(%q)", key)
 		return nil, fmt.Errorf("No Successors found")
 	}
+
 	value, err := kv.ring.Transport().Get(succVnodes[0], key, v)
 
 	// TODO: Should we retry this call if there is an error?
@@ -151,9 +152,4 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 
 	err = kv.lm.CommitWLock(key, v)
 	return err
-}
-
-func (kv *KVStoreClientImpl) List() ([]string, error) {
-	// Will be used only by the replicators
-	return nil, nil
 }
