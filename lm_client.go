@@ -1,4 +1,4 @@
-package chord
+package buddystore
 
 import (
 	"fmt"
@@ -77,7 +77,6 @@ func (lm *LManagerClient) WLock(key string, version uint, timeout uint) (uint, e
 	if err != nil {
 		return 0, err
 	}
-
 
 	retLockID, ver, timeout, err := lm.Ring.transport.WLock(LMVnodes[0], key, version, timeout, "testNodeId")
 	if err != nil {

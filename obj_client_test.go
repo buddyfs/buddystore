@@ -1,4 +1,4 @@
-package chord
+package buddystore
 
 import (
 	"fmt"
@@ -7,40 +7,91 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKVGetNonExistent(t *testing.T) {
-	// Setting static port numbers here leads to brittle tests.
-	// TODO: Is it possible to randomize port allocation, or use local transport?
-	var listen string = fmt.Sprintf("localhost:%d", PORT+10)
-	trans, _ := InitTCPTransport(listen, timeout)
-	var conf *Config = fastConf()
-	r, _ := Create(conf, trans)
+var TEST_VALUE = []byte("FOOBAR")
 
-	kvsClient := NewKVStoreClient(r)
-	v, err := kvsClient.Get(TEST_KEY)
+func CreateKVClientWithMocks() (*MockTransport, *MockRing, *MockLM, KVStoreClient) {
+	// Set up mock Ring and mock Lock Manager.
+	t := &MockTransport{}
+	r := &MockRing{transport: t, numSuccessors: 2}
+	lm := new(MockLM)
 
-	assert.Nil(t, v, "Expecting nil value for non-existent key")
-	assert.Error(t, err, "Expecting error while reading non-existent key")
+	// Create KVStore client.
+	kvsClient := NewKVStoreClientWithLM(r, lm)
 
-	r.Shutdown()
+	return t, r, lm, kvsClient
 }
 
-func TestKVSetNewThenGet(t *testing.T) {
-	var listen string = fmt.Sprintf("localhost:%d", PORT+11)
-	trans, _ := InitTCPTransport(listen, timeout)
-	var conf *Config = fastConf()
-	r, _ := Create(conf, trans)
+func TestKVGetNonExistentKey(t *testing.T) {
+	_, r, lm, kvsClient := CreateKVClientWithMocks()
 
-	kvsClient := NewKVStoreClient(r)
-
-	bar := []byte("bar")
-
-	err := kvsClient.Set(TEST_KEY, bar)
-	assert.NoError(t, err, "Writing to new key should have no failures")
+	lm.On("RLock", TEST_KEY, false).Return(0, fmt.Errorf("Key not found")).Once()
 
 	v, err := kvsClient.Get(TEST_KEY)
+	assert.Nil(t, v)
+	assert.Error(t, err, "Could not read data")
 
-	assert.NoError(t, err, "Expecting no error while reading existing key")
-	assert.Equal(t, v, bar, "Sequential consistency check")
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
 
-	r.Shutdown()
+func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
+	_, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return(nil, fmt.Errorf("Lookup failed")).Once()
+
+	v, err := kvsClient.Get(TEST_KEY)
+	assert.Nil(t, v)
+	assert.Error(t, err, "Could not read data")
+
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+
+	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]Vnode{}, nil).Once()
+
+	v, err = kvsClient.Get(TEST_KEY)
+	assert.Nil(t, v)
+	assert.Error(t, err, "Could not read data")
+
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVGetExistingKeyWithNodeErrors(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
+
+	v, err := kvsClient.Get(TEST_KEY)
+	assert.Nil(t, v)
+	assert.Error(t, err, "Could not read data")
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
+
+	v, err := kvsClient.Get(TEST_KEY)
+	assert.Equal(t, TEST_VALUE, v)
+	assert.Nil(t, err)
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
 }

@@ -2,7 +2,7 @@
 This package is used to provide an implementation of the
 Chord network protocol.
 */
-package chord
+package buddystore
 
 import (
 	"crypto/sha1"
@@ -118,6 +118,14 @@ type localVnode struct {
 	lm          *LManager
 }
 
+type RingIntf interface {
+	Leave() error
+	Shutdown()
+	Lookup(n int, key []byte) ([]*Vnode, error)
+	Transport() Transport
+	GetNumSuccessors() int
+}
+
 // Stores the state required for a Chord ring
 type Ring struct {
 	config     *Config
@@ -125,6 +133,9 @@ type Ring struct {
 	vnodes     []*localVnode
 	delegateCh chan func()
 	shutdown   chan bool
+
+	// Implements:
+	RingIntf
 }
 
 // Returns the default Ring configuration
@@ -249,4 +260,12 @@ func (r *Ring) Lookup(n int, key []byte) ([]*Vnode, error) {
 		successors = successors[:len(successors)-1]
 	}
 	return successors, nil
+}
+
+func (r *Ring) Transport() Transport {
+	return r.transport
+}
+
+func (r *Ring) GetNumSuccessors() int {
+	return r.config.NumSuccessors
 }

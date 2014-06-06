@@ -1,6 +1,7 @@
-package chord
+package buddystore
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/golang/glog"
@@ -12,7 +13,7 @@ type KVStoreClient interface {
 }
 
 type KVStoreClientImpl struct {
-	ring *Ring
+	ring RingIntf
 	lm   LMClientIntf
 
 	// Implements
@@ -24,6 +25,10 @@ var _ KVStoreClient = &KVStoreClientImpl{}
 func NewKVStoreClient(ring *Ring) *KVStoreClientImpl {
 	lm := &LManagerClient{Ring: ring, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	return &KVStoreClientImpl{ring: ring, lm: lm}
+}
+
+func NewKVStoreClientWithLM(ringIntf RingIntf, lm LMClientIntf) *KVStoreClientImpl {
+	return &KVStoreClientImpl{ring: ringIntf, lm: lm}
 }
 
 /*
@@ -46,7 +51,7 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
+	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
 		glog.Errorf("Error listing successors in Get(%q): %q", key, err)
 		return nil, err
@@ -56,7 +61,12 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
-	value, err := kv.ring.transport.Get(succVnodes[0], key, v)
+	if len(succVnodes) == 0 {
+		glog.Errorf("No successors found during Lookup in Get(%q)", key)
+		return nil, fmt.Errorf("No Successors found")
+	}
+
+	value, err := kv.ring.Transport().Get(succVnodes[0], key, v)
 
 	// TODO: Should we retry this call if there is an error?
 	return value, err
@@ -83,7 +93,7 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 		return err
 	}
 
-	succVnodes, err := kv.ring.Lookup(kv.ring.config.NumSuccessors, []byte(key))
+	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
 		glog.Errorf("Error listing successors in Set(%q): %q", key, err)
 		return err
@@ -107,7 +117,7 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 		<-tokens
 
 		// Perform the operation
-		*err = kv.ring.transport.Set(node, key, v, value)
+		*err = kv.ring.Transport().Set(node, key, v, value)
 
 		// Return the token
 		tokens <- true
@@ -142,9 +152,4 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 
 	err = kv.lm.CommitWLock(key, v)
 	return err
-}
-
-func (kv *KVStoreClientImpl) List() ([]string, error) {
-	// Will be used only by the replicators
-	return nil, nil
 }
