@@ -29,7 +29,7 @@ func (vn *localVnode) init(idx int) {
 	vn.ring.transport.Register(&vn.Vnode, vn)
 
 	// Initialise the key-value store
-	vn.store = &KVStore{kv: make(map[string]*list.List)}
+	vn.store = &KVStore{vn: vn, kv: make(map[string]*list.List)}
 }
 
 // Schedules the Vnode to do regular maintenence
@@ -386,5 +386,29 @@ func (vn *localVnode) InvalidateRLock(lockID string) error {
 
 func (vn *localVnode) AbortWLock(key string, version uint, nodeID string) error {
 	err := vn.lm.abortWLock(key, version, nodeID)
+	return err
+}
+
+func (vn *localVnode) Get(key string, version uint) ([]byte, error) {
+	val, err := vn.store.get(key, version)
+
+	return val, err
+}
+
+func (vn *localVnode) Set(key string, version uint, value []byte) error {
+	err := vn.store.set(key, version, value)
+
+	return err
+}
+
+func (vn *localVnode) List() ([]string, error) {
+	keys, err := vn.store.list()
+
+	return keys, err
+}
+
+func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
+	err := vn.store.purgeVersions(key, maxVersion)
+
 	return err
 }

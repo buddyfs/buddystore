@@ -7,37 +7,8 @@ import (
 )
 
 const (
-	MaxReplicationParallelism = 4
+	MaxReplicationParallelism = 8
 )
-
-/* TCP body for KV store requests */
-type tcpBodyGet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-}
-
-type tcpBodySet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-	Value   []byte
-}
-
-type tcpBodyList struct {
-	Vnode *Vnode
-}
-
-/* TCP body for KV store responses */
-type tcpBodyRespValue struct {
-	Value []byte
-	Err   error
-}
-
-type tcpBodyRespKeys struct {
-	Keys []string
-	Err  error
-}
 
 // New Vnode operations added for supporting KV store
 type KVStoreValue struct {
@@ -46,15 +17,28 @@ type KVStoreValue struct {
 }
 
 type KVStore struct {
+	vn     *localVnode
 	kv     map[string]*list.List
 	kvLock sync.Mutex
+
+	// Implements:
+	KVStoreIntf
 }
 
-func (vn *localVnode) Get(key string, version uint) ([]byte, error) {
-	vn.store.kvLock.Lock()
-	defer vn.store.kvLock.Unlock()
+type KVStoreIntf interface {
+	get(string, uint) ([]byte, error)
+	set(string, uint, []byte) error
+	list() ([]byte, error)
+	purgeVersions(string, uint) error
+	incSync(string, uint, []byte) error
+	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)
+}
 
-	kvLst, found := vn.store.kv[key]
+func (kvs *KVStore) get(key string, version uint) ([]byte, error) {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
+
+	kvLst, found := kvs.kv[key]
 
 	if !found {
 		return nil, fmt.Errorf("Key not found")
@@ -72,42 +56,18 @@ func (vn *localVnode) Get(key string, version uint) ([]byte, error) {
 	return nil, nil
 }
 
-func (vn *localVnode) Set(key string, version uint, value []byte) error {
-	vn.store.kvLock.Lock()
-	defer vn.store.kvLock.Unlock()
-
-	var wg sync.WaitGroup
-	var tokens chan bool
-	var errs []error
-
-	tokens = make(chan bool, MaxReplicationParallelism)
-	errs = make([]error, len(vn.successors))
-
-	for i := 0; i < MaxReplicationParallelism; i++ {
-		tokens <- true
-	}
-
-	//Function to replicate the KV to the successors
-	replicateKV := func(succVnode *Vnode, key string, version uint, value []byte, wg *sync.WaitGroup, tokens chan bool, retErr *error) error {
-		defer wg.Done()
-
-		<-tokens
-
-		*retErr = vn.ring.transport.Set(succVnode, key, version, value)
-
-		tokens <- true
-
-		return nil
-	}
+func (kvs *KVStore) set(key string, version uint, value []byte) error {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
 
 	kvVal := &KVStoreValue{ver: version, val: value}
 
-	kvLst, found := vn.store.kv[key]
+	kvLst, found := kvs.kv[key]
 
 	if !found {
 		// This is the first value being added to the list.
 		kvLst = list.New()
-		vn.store.kv[key] = kvLst
+		kvs.kv[key] = kvLst
 
 		kvLst.PushFront(kvVal)
 	} else {
@@ -126,43 +86,29 @@ func (vn *localVnode) Set(key string, version uint, value []byte) error {
 		kvLst.PushFront(kvVal)
 	}
 
-	// If we are the owner of the key, replicate the KV to the
-	// successors
-	if (vn.predecessor == nil) || ((vn.predecessor != nil) && (betweenRightIncl(vn.predecessor.Id, vn.Id, []byte(key)))) {
-
-		for idx, succ := range vn.successors {
-			wg.Add(1)
-
-			go replicateKV(succ, key, version, value, &wg, tokens, &errs[idx])
-		}
-
-		wg.Wait()
-
-		for idx := range vn.successors {
-			if errs[idx] != nil {
-				return errs[idx]
-			}
-		}
-	}
+	kvs.incSync(key, version, value)
 
 	return nil
 }
 
-func (vn *localVnode) List() ([]string, error) {
-	ret := make([]string, 0, len(vn.store.kv))
+func (kvs *KVStore) list() ([]string, error) {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
 
-	for key := range vn.store.kv {
+	ret := make([]string, 0, len(kvs.kv))
+
+	for key := range kvs.kv {
 		ret = append(ret, key)
 	}
 
 	return ret, nil
 }
 
-func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
-	vn.store.kvLock.Lock()
-	defer vn.store.kvLock.Unlock()
+func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
 
-	kvLst, found := vn.store.kv[key]
+	kvLst, found := kvs.kv[key]
 
 	if !found {
 		return fmt.Errorf("Key not found")
@@ -171,7 +117,7 @@ func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
 	i := kvLst.Front()
 
 	for i != nil {
-           // Remove all values with version less than the max version
+		// Remove all values with version less than the max version
 		if i.Value.(*KVStoreValue).ver < maxVersion {
 			toBeDel := i
 			i = i.Next()
@@ -184,8 +130,58 @@ func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
 	}
 
 	if kvLst.Len() == 0 {
-		delete(vn.store.kv, key)
+		delete(kvs.kv, key)
 	}
 
 	return nil
+}
+
+func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
+	var wg sync.WaitGroup
+	var tokens chan bool
+	var errs []error
+
+	tokens = make(chan bool, MaxReplicationParallelism)
+	errs = make([]error, len(kvs.vn.successors))
+
+	for i := 0; i < MaxReplicationParallelism; i++ {
+		tokens <- true
+	}
+
+	// If we are the owner of the key, replicate the KV to the
+	// successors
+	if (kvs.vn.predecessor == nil) || ((kvs.vn.predecessor != nil) && (betweenRightIncl(kvs.vn.predecessor.Id, kvs.vn.Id, []byte(key)))) {
+
+		for idx, succVn := range kvs.vn.successors {
+			if succVn != nil {
+				wg.Add(1)
+
+				go kvs.incSyncToSucc(succVn, key, version, value, &wg, tokens, &errs[idx])
+			}
+		}
+
+		wg.Wait()
+
+		for idx := range kvs.vn.successors {
+			if errs[idx] != nil {
+				return errs[idx]
+			}
+		}
+	}
+
+	return nil
+}
+
+func (kvs *KVStore) incSyncToSucc(succVn *Vnode, key string, version uint, value []byte, wg *sync.WaitGroup, tokens chan bool, retErr *error) {
+	defer wg.Done()
+
+	<-tokens
+
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(succVn)
+
+	if !ok {
+		kvs.vn.ring.transport.(*LocalTransport).remote.Set(succVn, key, version, value)
+	}
+
+	tokens <- true
 }
