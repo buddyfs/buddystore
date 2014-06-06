@@ -6,6 +6,10 @@ import (
 	"sync"
 )
 
+const (
+	MaxReplicationParallelism = 4
+)
+
 /* TCP body for KV store requests */
 type tcpBodyGet struct {
 	Vnode   *Vnode
@@ -72,6 +76,30 @@ func (vn *localVnode) Set(key string, version uint, value []byte) error {
 	vn.store.kvLock.Lock()
 	defer vn.store.kvLock.Unlock()
 
+	var wg sync.WaitGroup
+	var tokens chan bool
+	var errs []error
+
+	tokens = make(chan bool, MaxReplicationParallelism)
+	errs = make([]error, len(vn.successors))
+
+	for i := 0; i < MaxReplicationParallelism; i++ {
+		tokens <- true
+	}
+
+	//Function to replicate the KV to the successors
+	replicateKV := func(succVnode *Vnode, key string, version uint, value []byte, wg *sync.WaitGroup, tokens chan bool, retErr *error) error {
+		defer wg.Done()
+
+		<-tokens
+
+		*retErr = vn.ring.transport.Set(succVnode, key, version, value)
+
+		tokens <- true
+
+		return nil
+	}
+
 	kvVal := &KVStoreValue{ver: version, val: value}
 
 	kvLst, found := vn.store.kv[key]
@@ -82,22 +110,39 @@ func (vn *localVnode) Set(key string, version uint, value []byte) error {
 		vn.store.kv[key] = kvLst
 
 		kvLst.PushFront(kvVal)
+	} else {
+		curMaxVerVal := kvLst.Front()
 
-		return nil
-	}
+		// Add a value only if the version is greater than the
+		// current max version
+		if curMaxVerVal != nil {
+			maxVer := curMaxVerVal.Value.(*KVStoreValue).ver
 
-	curMaxVerVal := kvLst.Front()
-
-	if curMaxVerVal != nil {
-		maxVer := curMaxVerVal.Value.(*KVStoreValue).ver
-
-		if maxVer >= version {
-			return fmt.Errorf("Lower version than current max version")
+			if maxVer >= version {
+				return fmt.Errorf("Lower version than current max version")
+			}
 		}
 
 		kvLst.PushFront(kvVal)
-	} else {
-		kvLst.PushFront(kvVal)
+	}
+
+	// If we are the owner of the key, replicate the KV to the
+	// successors
+	if (vn.predecessor == nil) || ((vn.predecessor != nil) && (betweenRightIncl(vn.predecessor.Id, vn.Id, []byte(key)))) {
+
+		for idx, succ := range vn.successors {
+			wg.Add(1)
+
+			go replicateKV(succ, key, version, value, &wg, tokens, &errs[idx])
+		}
+
+		wg.Wait()
+
+		for idx := range vn.successors {
+			if errs[idx] != nil {
+				return errs[idx]
+			}
+		}
 	}
 
 	return nil
@@ -111,4 +156,36 @@ func (vn *localVnode) List() ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
+	vn.store.kvLock.Lock()
+	defer vn.store.kvLock.Unlock()
+
+	kvLst, found := vn.store.kv[key]
+
+	if !found {
+		return fmt.Errorf("Key not found")
+	}
+
+	i := kvLst.Front()
+
+	for i != nil {
+           // Remove all values with version less than the max version
+		if i.Value.(*KVStoreValue).ver < maxVersion {
+			toBeDel := i
+			i = i.Next()
+			kvLst.Remove(toBeDel)
+
+			continue
+		}
+
+		i = i.Next()
+	}
+
+	if kvLst.Len() == 0 {
+		delete(vn.store.kv, key)
+	}
+
+	return nil
 }
