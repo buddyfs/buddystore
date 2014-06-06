@@ -65,7 +65,8 @@ func (mt *MockTransport) Get(target *Vnode, key string, version uint) ([]byte, e
 }
 
 func (mt *MockTransport) Set(target *Vnode, key string, version uint, value []byte) error {
-	panic("Mock method not implemented")
+	args := mt.Mock.Called(target, key, version, value)
+	return args.Error(0)
 }
 
 func (mt *MockTransport) List(target *Vnode) ([]string, error) {
