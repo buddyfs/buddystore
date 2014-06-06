@@ -192,23 +192,38 @@ func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint,
 func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
 	lmVnodeRpc, ok := lt.get(targetLm)
 	if !ok {
-		lt.remote.AbortWLock(targetLm, key, version, nodeID)
+		return lt.remote.AbortWLock(targetLm, key, version, nodeID)
 	}
 	return lmVnodeRpc.AbortWLock(key, version, nodeID)
 }
 
 func (lt *LocalTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
-	vnodeRpc, _ := lt.get(target)
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.Get(target, key, version)
+	}
+
 	return vnodeRpc.Get(key, version)
 }
 
 func (lt *LocalTransport) Set(target *Vnode, key string, version uint, value []byte) error {
-	vnodeRpc, _ := lt.get(target)
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.Set(target, key, version, value)
+	}
+
 	return vnodeRpc.Set(key, version, value)
 }
 
 func (lt *LocalTransport) List(target *Vnode) ([]string, error) {
-	vnodeRpc, _ := lt.get(target)
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.List(target)
+	}
+
 	return vnodeRpc.List()
 }
 
