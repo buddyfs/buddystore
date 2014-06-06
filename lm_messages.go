@@ -1,9 +1,10 @@
 package buddystore
 
 type tcpBodyLMRLockReq struct {
-	Vn       *Vnode
-	SenderID string
-	Key      string
+	Vn         *Vnode
+	SenderID   string
+	Key        string
+	SenderAddr string
 }
 
 type tcpBodyLMRLockResp struct {
@@ -46,5 +47,14 @@ type tcpBodyLMAbortWLockReq struct {
 }
 
 type tcpBodyLMAbortWLockResp struct {
+	Err error
+}
+
+type tcpBodyLMInvalidateRLockReq struct {
+	Vn     *Vnode
+	LockID string
+}
+
+type tcpBodyLMInvalidateRLockResp struct {
 	Err error
 }

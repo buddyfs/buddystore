@@ -54,6 +54,10 @@ func (mt *MockTransport) AbortWLock(*Vnode, string, uint, string) error {
 	panic("Mock method not implemented")
 }
 
+func (mt *MockTransport) InvalidateRLock(*Vnode, string) error {
+	panic("Mock method not implemented")
+}
+
 func (mt *MockTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
 	args := mt.Mock.Called(target, key, version)
 	res, ok := args.Get(0).([]byte)
