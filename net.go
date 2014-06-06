@@ -67,9 +67,40 @@ type tcpHeader struct {
 	ReqType int
 }
 
+type tcpRequest interface {
+}
+
+type tcpResponseBody interface {
+}
+
+type tcpResponse interface {
+	Error() error
+	SetError(error)
+}
+
+type tcpResponseImpl struct {
+	Err error
+
+	// Implements:
+	tcpResponse
+}
+
+func (t *tcpResponseImpl) Error() error {
+	return t.Err
+}
+
+func (t *tcpResponseImpl) SetError(err error) {
+	t.Err = err
+}
+
+var _ tcpResponse = new(tcpBodyVnodeListError)
+
 // Potential body types
 type tcpBodyError struct {
-	Err error
+	Dummy bool
+
+	// Extends:
+	tcpResponseImpl
 }
 type tcpBodyString struct {
 	S string
@@ -86,17 +117,26 @@ type tcpBodyFindSuc struct {
 	Num    int
 	Key    []byte
 }
+
 type tcpBodyVnodeError struct {
 	Vnode *Vnode
-	Err   error
+
+	// Extends:
+	tcpResponseImpl
 }
+
 type tcpBodyVnodeListError struct {
 	Vnodes []*Vnode
-	Err    error
+
+	// Extends:
+	tcpResponseImpl
 }
+
 type tcpBodyBoolError struct {
-	B   bool
-	Err error
+	B bool
+
+	// Extends:
+	tcpResponseImpl
 }
 
 /* TCP body for KV store requests */
@@ -120,12 +160,16 @@ type tcpBodyList struct {
 /* TCP body for KV store responses */
 type tcpBodyRespValue struct {
 	Value []byte
-	Err   error
+
+	// Extends:
+	tcpResponseImpl
 }
 
 type tcpBodyRespKeys struct {
 	Keys []string
-	Err  error
+
+	// Extends:
+	tcpResponseImpl
 }
 
 // Creates a new TCP transport on the given listen address with the
@@ -239,62 +283,11 @@ func (t *TCPTransport) setupConn(c *net.TCPConn) {
 	c.SetKeepAlive(true)
 }
 
-// Gets a list of the vnodes on the box
-func (t *TCPTransport) ListVnodes(host string) ([]*Vnode, error) {
+func (t *TCPTransport) networkCall(host string, tcpReqType int, req tcpRequest, resp tcpResponse) error {
 	// Get a conn
 	out, err := t.getConn(host)
 	if err != nil {
-		return nil, err
-	}
-
-	// Response channels
-	respChan := make(chan []*Vnode, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpListReq
-		body := tcpBodyString{S: host}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyVnodeListError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- resp.Vnodes
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return nil, fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return nil, err
-	case res := <-respChan:
-		return res, nil
-	}
-}
-
-// Ping a Vnode, check for liveness
-func (t *TCPTransport) Ping(vn *Vnode) (bool, error) {
-	// Get a conn
-	out, err := t.getConn(vn.Host)
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	// Response channels
@@ -303,190 +296,97 @@ func (t *TCPTransport) Ping(vn *Vnode) (bool, error) {
 
 	go func() {
 		// Send a list command
-		out.header.ReqType = tcpPing
-		body := tcpBodyVnode{Vn: vn}
+		out.header.ReqType = tcpReqType
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
 			return
 		}
-		if err := out.enc.Encode(&body); err != nil {
+		if err := out.enc.Encode(req); err != nil {
 			errChan <- err
 			return
 		}
 
 		// Read in the response
-		resp := tcpBodyBoolError{}
-		if err := out.dec.Decode(&resp); err != nil {
+		if err := out.dec.Decode(resp); err != nil {
 			errChan <- err
-			return
 		}
 
 		// Return the connection
 		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- resp.B
+		if resp.Error() == nil {
+			respChan <- true
 		} else {
-			errChan <- resp.Err
+			errChan <- resp.Error()
 		}
 	}()
 
 	select {
 	case <-time.After(t.timeout):
-		return false, fmt.Errorf("Command timed out!")
+		return fmt.Errorf("Command timed out!")
 	case err := <-errChan:
+		return err
+	case <-respChan:
+		return nil
+	}
+}
+
+// Gets a list of the vnodes on the box
+func (t *TCPTransport) ListVnodes(host string) ([]*Vnode, error) {
+	resp := tcpBodyVnodeListError{}
+	err := t.networkCall(host, tcpListReq, tcpBodyString{S: host}, &resp)
+
+	if err != nil {
+		return nil, err
+	} else {
+		return resp.Vnodes, nil
+	}
+}
+
+// Ping a Vnode, check for liveness
+func (t *TCPTransport) Ping(vn *Vnode) (bool, error) {
+	resp := tcpBodyBoolError{}
+	err := t.networkCall(vn.Host, tcpPing, tcpBodyVnode{Vn: vn}, &resp)
+
+	if err != nil {
 		return false, err
-	case res := <-respChan:
-		return res, nil
+	} else {
+		return resp.B, nil
 	}
 }
 
 // Request a nodes predecessor
 func (t *TCPTransport) GetPredecessor(vn *Vnode) (*Vnode, error) {
-	// Get a conn
-	out, err := t.getConn(vn.Host)
+	resp := tcpBodyVnodeError{}
+	err := t.networkCall(vn.Host, tcpGetPredReq, tcpBodyVnode{Vn: vn}, &resp)
+
 	if err != nil {
 		return nil, err
-	}
-
-	respChan := make(chan *Vnode, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpGetPredReq
-		body := tcpBodyVnode{Vn: vn}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyVnodeError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- resp.Vnode
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return nil, fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return nil, err
-	case res := <-respChan:
-		return res, nil
+	} else {
+		return resp.Vnode, nil
 	}
 }
 
 // Notify our successor of ourselves
 func (t *TCPTransport) Notify(target, self *Vnode) ([]*Vnode, error) {
-	// Get a conn
-	out, err := t.getConn(target.Host)
+	resp := tcpBodyVnodeListError{}
+	err := t.networkCall(target.Host, tcpNotifyReq, tcpBodyTwoVnode{Target: target, Vn: self}, &resp)
+
 	if err != nil {
 		return nil, err
-	}
-
-	respChan := make(chan []*Vnode, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpNotifyReq
-		body := tcpBodyTwoVnode{Target: target, Vn: self}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyVnodeListError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- resp.Vnodes
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return nil, fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return nil, err
-	case res := <-respChan:
-		return res, nil
+	} else {
+		return resp.Vnodes, nil
 	}
 }
 
 // Find a successor
 func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, error) {
-	// Get a conn
-	out, err := t.getConn(vn.Host)
+	resp := tcpBodyVnodeListError{}
+	err := t.networkCall(vn.Host, tcpFindSucReq, tcpBodyFindSuc{Target: vn, Num: n, Key: k}, &resp)
+
 	if err != nil {
 		return nil, err
-	}
-
-	respChan := make(chan []*Vnode, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpFindSucReq
-		body := tcpBodyFindSuc{Target: vn, Num: n, Key: k}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyVnodeListError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- resp.Vnodes
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return nil, fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return nil, err
-	case res := <-respChan:
-		return res, nil
+	} else {
+		return resp.Vnodes, nil
 	}
 }
 
@@ -494,256 +394,64 @@ func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, err
  */
 
 func (t *TCPTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return make([]byte, 0), err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyRespValue{}
-	go func() {
-		out.header.ReqType = tcpGet
-		body := tcpBodyGet{Vnode: target, Key: key}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
+	err := t.networkCall(target.Host, tcpGet, tcpBodyGet{Vnode: target, Key: key, Version: version}, &resp)
 
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return make([]byte, 0), fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return make([]byte, 0), err
-	case _ = <-respChan:
+	if err != nil {
+		return nil, err
+	} else {
 		return resp.Value, nil
 	}
-
 }
 
 /* Transport operation that sets the value of a given key - This operation is additional to what is there in the interface already
  */
 
 func (t *TCPTransport) Set(target *Vnode, key string, version uint, value []byte) error {
-	// Get a conn
-	out, err := t.getConn(target.Host)
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpSet, tcpBodySet{Vnode: target, Key: key, Version: version, Value: value}, &resp)
+
 	if err != nil {
 		return err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
-	resp := tcpBodyError{}
-
-	go func() {
-		out.header.ReqType = tcpSet
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		body := tcpBodySet{Vnode: target, Key: key, Value: value}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return err
-	case _ = <-respChan:
+	} else {
 		return nil
 	}
-
 }
 
 /* Transport operation that lists the keys for a particular ring - This operation is additional to what is there in the interface already
  */
 
 func (t *TCPTransport) List(target *Vnode) ([]string, error) {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return make([]string, 0), err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyRespKeys{}
+	err := t.networkCall(target.Host, tcpList, tcpBodyList{Vnode: target}, &resp)
 
-	go func() {
-		out.header.ReqType = tcpList
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		body := tcpBodyList{Vnode: target}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return make([]string, 0), fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return make([]string, 0), err
-	case _ = <-respChan:
+	if err != nil {
+		return nil, err
+	} else {
 		return resp.Keys, nil
 	}
-
 }
 
 // Clears a predecessor if it matches a given vnode. Used to leave.
 func (t *TCPTransport) ClearPredecessor(target, self *Vnode) error {
-	// Get a conn
-	out, err := t.getConn(target.Host)
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpClearPredReq, tcpBodyTwoVnode{Target: target, Vn: self}, &resp)
+
 	if err != nil {
 		return err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpClearPredReq
-		body := tcpBodyTwoVnode{Target: target, Vn: self}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return err
-	case <-respChan:
+	} else {
 		return nil
 	}
 }
 
 // Instructs a node to skip a given successor. Used to leave.
 func (t *TCPTransport) SkipSuccessor(target, self *Vnode) error {
-	// Get a conn
-	out, err := t.getConn(target.Host)
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpSkipSucReq, tcpBodyTwoVnode{Target: target, Vn: self}, &resp)
+
 	if err != nil {
 		return err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpSkipSucReq
-		body := tcpBodyTwoVnode{Target: target, Vn: self}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Read in the response
-		resp := tcpBodyError{}
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return fmt.Errorf("Command timed out!")
-	case err := <-errChan:
-		return err
-	case <-respChan:
+	} else {
 		return nil
 	}
 }
@@ -840,51 +548,13 @@ Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 */
 func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string) (string, uint, error) {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return "", 0, err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyLMRLockResp{}
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpRLockReq
-		body := tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
+	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID}, &resp)
 
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return "", 0, fmt.Errorf("Command timed out!")
-	case _ = <-errChan:
+	if err != nil {
 		return "", 0, resp.Err
-	case <-respChan:
-		return resp.LockId, resp.Version, resp.Err
+	} else {
+		return resp.LockId, resp.Version, nil
 	}
 }
 
@@ -897,51 +567,13 @@ Param timeout : Requested Timeout value.
 Param NodeID : NodeID of the requesting node
 */
 func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return "", 0, 0, err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyLMWLockResp{}
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpWLockReq
-		body := tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
+	err := t.networkCall(target.Host, tcpWLockReq, tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}, &resp)
 
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return "", 0, 0, fmt.Errorf("Command timed out!")
-	case _ = <-errChan:
+	if err != nil {
 		return "", 0, 0, resp.Err
-	case <-respChan:
-		return resp.LockId, resp.Version, resp.Timeout, resp.Err
+	} else {
+		return resp.LockId, resp.Version, resp.Timeout, nil
 	}
 }
 
@@ -952,51 +584,14 @@ Param key : The key for which the read lock should be obtained
 Param version : The version of the key to be committed
 */
 func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, nodeID string) error {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyLMCommitWLockResp{}
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpCommitWLockReq
-		body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
+	body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+	err := t.networkCall(target.Host, tcpCommitWLockReq, body, &resp)
 
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return fmt.Errorf("Command timed out!")
-	case _ = <-errChan:
+	if err != nil {
 		return resp.Err
-	case <-respChan:
-		return resp.Err
+	} else {
+		return nil
 	}
 }
 
@@ -1006,51 +601,14 @@ Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 */
 func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeID string) error {
-	// Get a conn
-	out, err := t.getConn(target.Host)
-	if err != nil {
-		return err
-	}
-
-	respChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
 	resp := tcpBodyLMAbortWLockResp{}
-	go func() {
-		// Send a list command
-		out.header.ReqType = tcpAbortWLockReq
-		body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
-		if err := out.enc.Encode(&out.header); err != nil {
-			errChan <- err
-			return
-		}
-		if err := out.enc.Encode(&body); err != nil {
-			errChan <- err
-			return
-		}
+	body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+	err := t.networkCall(target.Host, tcpAbortWLockReq, body, &resp)
 
-		// Read in the response
-		if err := out.dec.Decode(&resp); err != nil {
-			errChan <- err
-			return
-		}
-
-		// Return the connection
-		t.returnConn(out)
-		if resp.Err == nil {
-			respChan <- true
-		} else {
-			errChan <- resp.Err
-		}
-	}()
-
-	select {
-	case <-time.After(t.timeout):
-		return fmt.Errorf("Command timed out!")
-	case _ = <-errChan:
+	if err != nil {
 		return resp.Err
-	case <-respChan:
-		return resp.Err
+	} else {
+		return nil
 	}
 }
 
@@ -1067,7 +625,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 	dec := gob.NewDecoder(conn)
 	enc := gob.NewEncoder(conn)
 	header := tcpHeader{}
-	var sendResp interface{}
+	var sendResp tcpResponse
 	for {
 		// Get the header
 		if err := dec.Decode(&header); err != nil {
@@ -1089,10 +647,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			// Generate a response
 			_, ok := t.get(body.Vn)
 			if ok {
-				sendResp = tcpBodyBoolError{B: ok, Err: nil}
+				sendResp = &tcpBodyBoolError{B: ok}
 			} else {
-				sendResp = tcpBodyBoolError{B: ok, Err: fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())}
+				sendResp = &tcpBodyBoolError{B: ok}
+				sendResp.SetError(fmt.Errorf("Target VN not found! Target %s:%s", body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpListReq:
@@ -1113,7 +671,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			t.lock.RUnlock()
 
 			// Make response
-			sendResp = tcpBodyVnodeListError{Vnodes: trimSlice(res)}
+			sendResp = &tcpBodyVnodeListError{Vnodes: trimSlice(res)}
 
 		case tcpGetPredReq:
 			body := tcpBodyVnode{}
