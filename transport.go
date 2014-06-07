@@ -167,8 +167,13 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 
 func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (string, uint, error) {
 	lmVnodeRpc, ok := lt.get(targetLm)
+	var myVnodeID string = ""
 	if !ok {
-		return lt.remote.RLock(targetLm, key, nodeID)
+		for k, _ := range lt.local {
+			myVnodeID = k
+			break //  TODO: Think of a better way
+		}
+		return lt.remote.RLock(targetLm, key, myVnodeID) //  Because the transport knows my nodeID better
 	}
 	return lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
 }
@@ -187,6 +192,14 @@ func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint,
 		return lt.remote.CommitWLock(targetLm, key, version, nodeID)
 	}
 	return lmVnodeRpc.CommitWLock(key, version, nodeID)
+}
+
+func (lt *LocalTransport) InvalidateRLock(targetClient *Vnode, lockID string) error {
+	lmVnodeRpc := lt.local[string(targetClient.Id)]
+	if lmVnodeRpc == nil {
+		return lt.remote.InvalidateRLock(targetClient, lockID)
+	}
+	return lmVnodeRpc.obj.InvalidateRLock(lockID)
 }
 
 func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string) error {

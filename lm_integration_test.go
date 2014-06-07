@@ -159,24 +159,26 @@ func TestWLockTimeTicker(t *testing.T) {
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	version, err := lm.WLock(TEST_KEY, 1, 10)
+	version, err := lm.WLock(TEST_KEY, 0, 2)
 	err = lm.CommitWLock(TEST_KEY, version)
-
+	if err != nil {
+		t.Fatalf("Commit failed : ", err)
+	}
 	readVersion, err := lm.RLock(TEST_KEY, true)
 	if readVersion != 1 {
 		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
 	}
-	version, err = lm.WLock(TEST_KEY_1, 2, 2)
-	time.Sleep(5 * time.Second)
-	err = lm.CommitWLock(TEST_KEY_1, version)
+	version, err = lm.WLock(TEST_KEY, 0, 2)
+	time.Sleep(3 * time.Second)
+	err = lm.CommitWLock(TEST_KEY, version)
 	if err == nil {
 		t.Fatalf("Expected : WLock should not be committed due to timeout")
 	}
+	t.Log(err)
 	r.Shutdown()
 }
 
-/* Remote Test : Create a couple of rings, try to make a Write, Commit, Read and Abort*/
-
+// Remote Test : Create a couple of rings, try to make a Write, Commit, Read and Abort
 func TestJoinLockRemote(t *testing.T) {
 	listen1 := fmt.Sprintf("localhost:%d", PORT+7)
 	listen2 := fmt.Sprintf("localhost:%d", PORT+8)
@@ -227,3 +229,54 @@ func TestJoinLockRemote(t *testing.T) {
 	r.Shutdown()
 	r2.Shutdown()
 }
+
+//  This is a end-to-end integration test. From Vnode to Vnode.
+//  TODO : Proceed after the Join protocol with one Vnode is fixed
+/*
+func TestRLockInvalidate(t *testing.T) {
+	listen1 := fmt.Sprintf("localhost:%d", PORT+1000)
+	listen2 := fmt.Sprintf("localhost:%d", PORT+1001)
+
+	t1, err1 := InitTCPTransport(listen1, timeout)
+	t2, err2 := InitTCPTransport(listen2, timeout)
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Error while trying to create TCP transports")
+	}
+
+	ml1 := InitLocalTransport(t1)
+	ml2 := InitLocalTransport(t2)
+
+	conf := fastConf()
+	conf.Hostname = "localhost:10000" // I know who am going to bootstrap with
+	r, err := Create(conf, ml1)
+	if err != nil {
+		t.Fatalf("unexpected err. %s", err)
+	}
+
+	conf2 := fastConf()
+	conf2.Hostname = "localhost:10001" //  I know where I reside
+	r2, err := Join(conf2, ml2, conf.Hostname)
+	if err != nil {
+		t.Fatalf("Failed to join the remote ring! Got %s", err)
+	}
+	version, err := r2.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
+	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
+	readVersion, err := r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+
+	version, err = r2.vnodes[0].lm_client.WLock(TEST_KEY, 2, 10)
+	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
+	readVersion, err = r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
+	if err != nil {
+		t.Fatalf("Error while reading version 1 of key_1 from remote server")
+	}
+	if readVersion != 2 {
+		t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
+	}
+
+	r.Shutdown()
+	r2.Shutdown()
+}
+*/

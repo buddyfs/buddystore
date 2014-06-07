@@ -61,6 +61,7 @@ const (
 	tcpWLockReq
 	tcpCommitWLockReq
 	tcpAbortWLockReq
+	tcpInvalidateRLockReq
 )
 
 type tcpHeader struct {
@@ -596,6 +597,60 @@ func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, node
 }
 
 /*
+InvalidateRLock transport layer implementation
+Param Vnode : The destination Vnode i.e. the Client where the RLock should be invalidated
+Param lockID : The exact lock to be invalidated
+*/
+func (t *TCPTransport) InvalidateRLock(target *Vnode, lockID string) error {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyLMInvalidateRLockResp{}
+	go func() {
+		// Send a list command
+		out.header.ReqType = tcpInvalidateRLockReq
+		body := tcpBodyLMInvalidateRLockReq{Vn: target, LockID: lockID}
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return fmt.Errorf("Command timed out!")
+	case _ = <-errChan:
+		return resp.Err
+	case <-respChan:
+		return resp.Err
+	}
+}
+
+/*
 AbortWLock transport layer implementation
 Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
@@ -842,7 +897,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if ok {
 				lockId, version, err :=
-					obj.RLock(body.Key, body.SenderID, conn.RemoteAddr().String())
+					obj.RLock(body.Key, body.SenderID, body.SenderAddr)
 
 				resp.Err = err
 				resp.LockId = lockId
@@ -911,6 +966,25 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 				err :=
 					obj.AbortWLock(body.Key, body.Version, body.SenderID)
 				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
+			}
+
+		case tcpInvalidateRLockReq:
+			body := tcpBodyLMInvalidateRLockReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj := t.local[string(body.Vn.Id)]
+			resp := tcpBodyLMInvalidateRLockResp{}
+			sendResp = &resp
+			if obj != nil {
+				_ = obj.obj.InvalidateRLock(body.LockID)
+				resp.Err = nil // Change it to incorporate the error from the client
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())

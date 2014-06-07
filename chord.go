@@ -50,6 +50,9 @@ type Transport interface {
 	//  Method to abort a write
 	AbortWLock(*Vnode, string, uint, string) error
 
+	//  Method to invalidate a client's RLock cache entry
+	InvalidateRLock(*Vnode, string) error
+
 	// KV Store operations
 	Get(target *Vnode, key string, version uint) ([]byte, error)
 	Set(target *Vnode, key string, version uint, value []byte) error
@@ -74,6 +77,7 @@ type VnodeRPC interface {
 	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
+	InvalidateRLock(lockID string) error
 }
 
 // Delegate to notify on ring events
@@ -116,6 +120,7 @@ type localVnode struct {
 	timer       *time.Timer
 	store       *KVStore
 	lm          *LManager
+	lm_client   *LManagerClient
 }
 
 type RingIntf interface {

@@ -375,6 +375,15 @@ func (vn *localVnode) CommitWLock(key string, version uint, nodeID string) error
 	return err
 }
 
+func (vn *localVnode) InvalidateRLock(lockID string) error {
+	lmClient := vn.lm_client
+	if lmClient == nil {
+		return fmt.Errorf("Client doesn't have a local LManagerClient associated with it")
+	}
+	err := lmClient.InvalidateRLock(lockID)
+	return err
+}
+
 func (vn *localVnode) AbortWLock(key string, version uint, nodeID string) error {
 	err := vn.lm.abortWLock(key, version, nodeID)
 	return err
