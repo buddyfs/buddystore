@@ -230,6 +230,7 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 			}
 		}
 	}
+	delete(lm.RLocks, key)
 	return nil
 }
 
