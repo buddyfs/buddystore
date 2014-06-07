@@ -131,6 +131,8 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (s
 }
 
 func (lm *LManager) checkWLock(key string) (bool, uint, error) {
+	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	wLockEntry := lm.WLocks[key]
 	if wLockEntry == nil {
 		return false, 0, nil
