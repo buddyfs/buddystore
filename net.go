@@ -550,7 +550,11 @@ Param key : The key for which the read lock should be obtained
 */
 func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string) (string, uint, error) {
 	resp := tcpBodyLMRLockResp{}
-	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID}, &resp)
+	for k, _ := range t.local {
+		nodeID = k
+		break //  Think of a better way to get the local nodeID
+	}
+	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID, SenderAddr: t.sock.Addr().String()}, &resp)
 
 	if err != nil {
 		return "", 0, resp.Err

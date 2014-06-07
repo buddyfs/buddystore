@@ -231,8 +231,6 @@ func TestJoinLockRemote(t *testing.T) {
 }
 
 //  This is a end-to-end integration test. From Vnode to Vnode.
-//  TODO : Proceed after the Join protocol with one Vnode is fixed
-/*
 func TestRLockInvalidate(t *testing.T) {
 	listen1 := fmt.Sprintf("localhost:%d", PORT+1000)
 	listen2 := fmt.Sprintf("localhost:%d", PORT+1001)
@@ -254,8 +252,10 @@ func TestRLockInvalidate(t *testing.T) {
 	}
 
 	conf2 := fastConf()
+	conf2.NumVnodes = 1
 	conf2.Hostname = "localhost:10001" //  I know where I reside
 	r2, err := Join(conf2, ml2, conf.Hostname)
+	time.Sleep(100 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
@@ -267,7 +267,11 @@ func TestRLockInvalidate(t *testing.T) {
 	}
 
 	version, err = r2.vnodes[0].lm_client.WLock(TEST_KEY, 2, 10)
-	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
+	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version) //  Will invalidate the RLock acquired for version 1
+	time.Sleep(200 * time.Millisecond)
+	if r2.vnodes[0].lm_client.keyInRLocksCache(TEST_KEY) {
+		t.Fatalf("Expected : Key should not be present in RLocks cache, but it is present even after invalidation")
+	}
 	readVersion, err = r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
 	if err != nil {
 		t.Fatalf("Error while reading version 1 of key_1 from remote server")
@@ -275,8 +279,10 @@ func TestRLockInvalidate(t *testing.T) {
 	if readVersion != 2 {
 		t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
 	}
+	if !r2.vnodes[0].lm_client.keyInRLocksCache(TEST_KEY) {
+		t.Fatalf("Expected : Key should be present in RLocks cache, but it is not present after the recent RLock request")
+	}
 
 	r.Shutdown()
 	r2.Shutdown()
 }
-*/

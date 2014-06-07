@@ -217,20 +217,19 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	lm.opsLogMut.Unlock()
 	lm.wLockMut.Unlock()
 
+	/* If it is the first version, then there could not be any previous version cached in RLock caches */
 	if version == 1 {
 		return nil
 	}
-	/*
-	    // TODO
-		if lm.RLocks[key] != nil {
-			for k, v := range lm.RLocks[key].nodeSet {
-				err := lm.Ring.transport.InvalidateRLock(&Vnode{Id: []byte(k), Host: v[1]}, v[0])
-				if err != nil {
-					// TODO : Discuss : Ignore?
-				}
+
+	if lm.RLocks[key] != nil {
+		for k, v := range lm.RLocks[key].nodeSet {
+			err := lm.Ring.transport.InvalidateRLock(&Vnode{Id: []byte(k), Host: v[1]}, v[0])
+			if err != nil {
+				// No-op
 			}
 		}
-	*/
+	}
 	return nil
 }
 

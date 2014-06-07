@@ -58,6 +58,8 @@ Param key : The key to be looked up
 Param forceNoCache : Invalidate existing ReadLocks and get a new lock from LM
 */
 func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, err error) {
+	lm.rLockMut.Lock()
+	defer lm.rLockMut.Unlock()
 	if !forceNoCache {
 		rLock := lm.RLocks[key]
 		if rLock != nil {
@@ -73,9 +75,7 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 	if err != nil {
 		return 0, fmt.Errorf("Cannot get ReadLock due to ", err)
 	}
-	lm.rLockMut.Lock()
 	lm.RLocks[key] = &RLockVal{lockID: retLockID, version: ver}
-	lm.rLockMut.Unlock()
 	return ver, nil
 }
 
@@ -134,12 +134,27 @@ func (lm *LManagerClient) AbortWLock(key string, version uint) error {
 }
 
 func (lm *LManagerClient) InvalidateRLock(lockID string) error {
-	_, ok := lm.RLocks[lockID]
-	if !ok {
+	var key string = ""
+	lm.rLockMut.Lock()
+	defer lm.rLockMut.Unlock()
+	for k, v := range lm.RLocks {
+		if v.lockID == lockID {
+			key = k
+		}
+	}
+	if key == "" {
 		return fmt.Errorf("Cannot find LockId on Client's RLock cache")
 	}
-	lm.rLockMut.Lock()
-	delete(lm.RLocks, lockID)
-	lm.rLockMut.Unlock()
+	delete(lm.RLocks, key)
 	return nil
+}
+
+func (lm *LManagerClient) keyInRLocksCache(key string) bool {
+	lm.rLockMut.Lock()
+	defer lm.rLockMut.Unlock()
+	_, ok := lm.RLocks[key]
+	if ok { //  No ternary in Go
+		return true
+	}
+	return false
 }
