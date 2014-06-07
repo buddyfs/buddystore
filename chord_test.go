@@ -205,6 +205,34 @@ func TestJoin(t *testing.T) {
 	r2.Shutdown()
 }
 
+/* Added to check the case when the "created" ring has only one vnode */
+/* TODO : Fixing
+func TestSingleNodeJoin(t *testing.T) {
+	// Create a multi transport
+	ml := InitMLTransport("", nil)
+
+	// Create the initial ring
+	conf := fastConf()
+	conf.NumVnodes = 1
+	r, err := Create(conf, ml)
+	if err != nil {
+		t.Fatalf("unexpected err. %s", err)
+	}
+
+	// Create a second ring
+	conf2 := fastConf()
+	conf2.Hostname = "test2"
+	r2, err := Join(conf2, ml, "test")
+	if err != nil {
+		t.Fatalf("failed to join local node! Got %s", err)
+	}
+
+	// Shutdown
+	r.Shutdown()
+	r2.Shutdown()
+}
+*/
+
 func TestJoinDeadHost(t *testing.T) {
 	// Create a multi transport
 	ml := InitMLTransport("", nil)

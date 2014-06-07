@@ -44,6 +44,7 @@ type LManager struct {
 	verMapMut  sync.Mutex             // Lock for synchronizing VersionMap accesses
 
 	TimeoutTicker *time.Ticker // Ticker that will periodically check WLocks for invalidation
+	LMCheckTicker *time.Ticker // Ticker that will periodically checks if LM has changed
 
 	currOpNum uint64         // Current Operation Number
 	OpsLog    []*OpsLogEntry //  Actual log used for write-ahead logging each operation
@@ -79,6 +80,36 @@ func (lm *LManager) scheduleTimeoutTicker() {
 				lm.wLockMut.Unlock()
 			case <-quit:
 				lm.TimeoutTicker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+/* Regularly check if I am the LockManager */
+func (lm *LManager) ScheduleLMCheckTicker() {
+	lm.LMCheckTicker = time.NewTicker(500 * time.Millisecond)
+	//  var myVnode *localVnode
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-lm.LMCheckTicker.C:
+				// Lookup for RingID
+				_, err := lm.Ring.Lookup(1, []byte(lm.Ring.config.RingId))
+				if err != nil {
+					continue
+				}
+				/*myVnode = lm.Ring.vnodes[0]
+								if myVnode.String() == LMVnodes[0].String() {
+				                    // TODO
+								} else {
+				                    // TODO
+								}
+				*/
+
+			case <-quit:
+				lm.LMCheckTicker.Stop()
 				return
 			}
 		}

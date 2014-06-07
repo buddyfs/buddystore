@@ -3,6 +3,7 @@ package buddystore
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -73,6 +74,7 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	conf2 := fastConf()
 	conf2.Hostname = "localhost:9013"
 	r2, err := Join(conf2, ml2, conf.Hostname)
+	time.Sleep(100 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}

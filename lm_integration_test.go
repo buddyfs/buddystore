@@ -80,15 +80,15 @@ func TestAbortLock(t *testing.T) {
 	version, _ = lm.WLock(TEST_KEY, 2, 10)
 	_ = lm.CommitWLock(TEST_KEY, version)
 	/*
-		readVersion, _ = lm.RLock(TEST_KEY, true)
-		if readVersion != 2 {
-			t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
-		}
-		version, _ = lm.WLock(TEST_KEY, 3, 10)
-	    err := lm.AbortWLock(TEST_KEY, version)
-		if err != nil {
-			t.Fatalf("Error while trying to Abort a write lock : ", err)
-		}*/
+			readVersion, _ = lm.RLock(TEST_KEY, true)
+			if readVersion != 2 {
+				t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
+			}
+			version, _ = lm.WLock(TEST_KEY, 3, 10)
+		    err := lm.AbortWLock(TEST_KEY, version)
+			if err != nil {
+				t.Fatalf("Error while trying to Abort a write lock : ", err)
+			}*/
 
 	readVersion, _ = lm.RLock(TEST_KEY, true)
 	if readVersion != 2 {
@@ -287,3 +287,42 @@ func TestRLockInvalidate(t *testing.T) {
 	r.Shutdown()
 	r2.Shutdown()
 }
+
+/* Check if there is only one lockManager irrespective of the number of members in the ring */
+/*
+func TestLMDetector(t *testing.T) {
+	var numRings uint = 3
+	var i uint
+	var err error
+	var trans *TCPTransport
+	r := make([]*Ring, numRings)
+	for i = 0; i < numRings; i++ {
+		go func(i uint) {
+			listen := fmt.Sprintf("localhost:%d", PORT+1020+i)
+			trans, err = InitTCPTransport(listen, timeout)
+			ml := InitLocalTransport(trans)
+			if err != nil {
+				t.Fatalf("Error while trying to create TCP transports")
+			}
+			conf := fastConf()
+			conf.Hostname = fmt.Sprintf("localhost:%d", PORT+1020+i)
+			conf.RingId = "a"
+			conf.NumVnodes = 1
+			if i != 0 {
+				r[i], err = Join(conf, ml, "localhost:10020")
+				time.Sleep(100 * time.Millisecond)
+			} else {
+				r[i], err = Create(conf, ml)
+			}
+			if err != nil {
+				t.Fatalf("Error while creating and joining rings : ", err)
+			}
+		}(i)
+	}
+
+	time.Sleep(700 * time.Millisecond)
+	for i = 0; i < numRings; i++ {
+		r[i].Shutdown()
+	}
+}
+*/
