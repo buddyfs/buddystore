@@ -159,19 +159,22 @@ func TestWLockTimeTicker(t *testing.T) {
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	version, err := lm.WLock(TEST_KEY, 1, 10)
+	version, err := lm.WLock(TEST_KEY, 0, 2)
 	err = lm.CommitWLock(TEST_KEY, version)
-
+    if err != nil {
+        t.Fatalf("Commit failed : ", err)
+    }
 	readVersion, err := lm.RLock(TEST_KEY, true)
 	if readVersion != 1 {
 		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
 	}
-	version, err = lm.WLock(TEST_KEY_1, 2, 2)
-	time.Sleep(5 * time.Second)
-	err = lm.CommitWLock(TEST_KEY_1, version)
+	version, err = lm.WLock(TEST_KEY, 0, 2)
+	time.Sleep(3 * time.Second)
+	err = lm.CommitWLock(TEST_KEY, version)
 	if err == nil {
 		t.Fatalf("Expected : WLock should not be committed due to timeout")
 	}
+    t.Log(err)
 	r.Shutdown()
 }
 
@@ -228,7 +231,7 @@ func TestJoinLockRemote(t *testing.T) {
 }
 
 //  This is a end-to-end integration test. From Vnode to Vnode.
-//  TODO : Incomplete. How to reach the LMClient from the LMserver
+//  TODO : Proceed after the Join protocol with one Vnode is fixed
 /*
 func TestRLockInvalidate(t *testing.T) {
 	listen1 := fmt.Sprintf("localhost:%d", PORT+1000)
@@ -243,7 +246,6 @@ func TestRLockInvalidate(t *testing.T) {
 	ml1 := InitLocalTransport(t1)
 	ml2 := InitLocalTransport(t2)
 
-	// Create the initial ring
 	conf := fastConf()
 	conf.Hostname = "localhost:10000" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
@@ -251,14 +253,12 @@ func TestRLockInvalidate(t *testing.T) {
 		t.Fatalf("unexpected err. %s", err)
 	}
 
-	// Create a second ring
 	conf2 := fastConf()
 	conf2.Hostname = "localhost:10001" //  I know where I reside
 	r2, err := Join(conf2, ml2, conf.Hostname)
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
-	// lm is the LockManagerClient for the new combined ring
 	version, err := r2.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
 	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
 	readVersion, err := r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
@@ -267,9 +267,7 @@ func TestRLockInvalidate(t *testing.T) {
 	}
 
 	version, err = r2.vnodes[0].lm_client.WLock(TEST_KEY, 2, 10)
-	// Check version in cache
 	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
-	// Sleep and check invalidation
 	readVersion, err = r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
 	if err != nil {
 		t.Fatalf("Error while reading version 1 of key_1 from remote server")

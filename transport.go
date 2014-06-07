@@ -195,7 +195,6 @@ func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint,
 }
 
 func (lt *LocalTransport) InvalidateRLock(targetClient *Vnode, lockID string) error {
-	fmt.Println("Local nodes on the sender side : ", lt.local)
 	lmVnodeRpc := lt.local[string(targetClient.Id)]
 	if lmVnodeRpc == nil {
 		return lt.remote.InvalidateRLock(targetClient, lockID)

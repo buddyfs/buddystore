@@ -1421,10 +1421,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			}
 
 			// Generate a response
-            fmt.Println("Server side : " , string(body.Vn.Id))
             obj := t.local[string(body.Vn.Id)]
-            fmt.Println("Vnode being searched for : ",body.Vn)
-            fmt.Println("Vnodes local to this node : ",t.local)
 			resp := tcpBodyLMInvalidateRLockResp{}
 			sendResp = &resp
 			if obj != nil {
@@ -1434,7 +1431,6 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
                 resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
                 body.Vn.Host, body.Vn.String())
             }
-            fmt.Println("Response from server : " , sendResp)
 
         default:
             log.Printf("[ERR] Unknown request type! Got %d", header.ReqType)

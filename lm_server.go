@@ -218,12 +218,8 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	if version == 1 {
 		return nil
 	}
-	fmt.Println("Nodes to be notified ")
-	fmt.Println(lm.RLocks[key])
 	if lm.RLocks[key] != nil {
 		for k, v := range lm.RLocks[key].nodeSet {
-			fmt.Println("**********************************************")
-			fmt.Println("Gonna invalidate the lock : ", v[0])
 			err := lm.Ring.transport.InvalidateRLock(&Vnode{Id: []byte(k), Host: v[1]}, v[0])
 			if err != nil {
 				// TODO : Discuss : Ignore?
