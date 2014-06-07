@@ -40,6 +40,8 @@ type LManager struct {
 	RLocks     map[string]*RLockEntry // Will have the nodeSets for whom the RLocks have been provided for a key
 	WLocks     map[string]*WLockEntry // Will have mapping from key to the metadata to be maintained
 	wLockMut   sync.Mutex             // Lock for synchronizing access to WLocks
+	rLockMut   sync.Mutex             // Lock for synchronizing access to RLocks
+	verMapMut  sync.Mutex             // Lock for synchronizing VersionMap accesses
 
 	TimeoutTicker *time.Ticker // Ticker that will periodically check WLocks for invalidation
 
@@ -94,14 +96,11 @@ func getLockID() (string, error) {
 	return hex.EncodeToString(lockID), nil
 }
 
-/*
-TODO : Discussion. When the server part comes up, it should instantiate multiple LockManager instances - one for each ring the node is part of.
-Then based on the request that comes in, the server should be able to delegate to the correct LM instance. So the net.go handleConn should have a map(ringId, LMinstance).
-
-*/
 func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
 
+	lm.verMapMut.Lock()
 	version := lm.VersionMap[key]
+	lm.verMapMut.Unlock()
 	if version == 0 {
 		return "", 0, fmt.Errorf("ReadLock not possible. Key not present in LM")
 	}
@@ -110,6 +109,8 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (s
 	if err != nil {
 		return "", 0, err
 	}
+
+	lm.rLockMut.Lock()
 
 	if lm.RLocks == nil {
 		lm.RLocks = make(map[string]*RLockEntry)
@@ -127,7 +128,8 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (s
 	rLockEntry.nodeSet[nodeID] = make([]string, 2)
 	rLockEntry.nodeSet[nodeID][0] = lockID     // Added the nodeID to the nodeSet for the given key
 	rLockEntry.nodeSet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
-	return lockID, lm.VersionMap[key], nil
+	lm.rLockMut.Unlock()
+	return lockID, version, nil
 }
 
 func (lm *LManager) checkWLock(key string) (bool, uint, error) {
@@ -146,9 +148,12 @@ TODO : Discuss : If Wlock exists then it will give back the version that is curr
 TODO : Discuss : Do not give the requested timeout right away. Validation.
 */
 func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+
+	lm.wLockMut.Lock()
 	if lm.WLocks == nil {
 		lm.WLocks = make(map[string]*WLockEntry)
 	}
+	lm.wLockMut.Unlock()
 
 	if lm.TimeoutTicker == nil {
 		lm.scheduleTimeoutTicker()
@@ -158,10 +163,13 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("Error while checking if a write lock exists already for that key")
 	}
+	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	if present {
 		return "", lm.WLocks[key].version, 0, fmt.Errorf("WriteLock not possible. Key is currently being updated")
 	}
 
+	lm.verMapMut.Lock()
 	//  Check if requested version is greater than the committed version
 	if version <= lm.VersionMap[key] {
 		if version == 0 { // Client wants to update
@@ -170,6 +178,7 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 			return "", lm.VersionMap[key], 0, fmt.Errorf("Committed version is higher than requested version")
 		}
 	}
+	lm.verMapMut.Unlock()
 
 	lockID, err := getLockID()
 	if err != nil {
@@ -177,20 +186,15 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 	}
 	t := time.Now().UTC()
 	t = t.Add(time.Duration(timeout) * time.Second)
-	lm.wLockMut.Lock()
 	lm.opsLogMut.Lock()
 	lm.currOpNum++
 	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "WRITE", Key: key, Version: version, Timeout: &t}
 	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: &t}
 	lm.opsLogMut.Unlock()
-	lm.wLockMut.Unlock()
 	return lockID, version, timeout, nil
 }
 
-/*
-TODO : Discuss : Is the version number really needed here? The client can just send the LockID to get it committed. The WLocks implementation will change accordingly
-*/
 func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	present, ver, err := lm.checkWLock(key)
 	if err != nil {
@@ -203,25 +207,28 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
 	}
 
+	lm.verMapMut.Lock()
 	/*TODO Wait until the backup LMs also perform the same operation and then commit it */
 	if lm.VersionMap == nil {
 		lm.VersionMap = make(map[string]uint)
 	}
 	lm.VersionMap[key] = version
+	lm.verMapMut.Unlock()
 	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	lm.opsLogMut.Lock()
 	lm.currOpNum++
 	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "COMMIT", Key: key, Version: version, Timeout: nil}
 	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 	delete(lm.WLocks, key)
 	lm.opsLogMut.Unlock()
-	lm.wLockMut.Unlock()
 
 	/* If it is the first version, then there could not be any previous version cached in RLock caches */
 	if version == 1 {
 		return nil
 	}
 
+	lm.rLockMut.Lock()
 	if lm.RLocks[key] != nil {
 		for k, v := range lm.RLocks[key].nodeSet {
 			err := lm.Ring.transport.InvalidateRLock(&Vnode{Id: []byte(k), Host: v[1]}, v[0])
@@ -231,6 +238,7 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 		}
 	}
 	delete(lm.RLocks, key)
+	lm.rLockMut.Unlock()
 	return nil
 }
 
@@ -246,13 +254,13 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string) error {
 		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot abort")
 	}
 
-	lm.wLockMut.Lock()
 	lm.opsLogMut.Lock()
 	lm.currOpNum++
 	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "ABORT", Key: key, Version: version, Timeout: nil}
 	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
+	lm.wLockMut.Lock()
 	delete(lm.WLocks, key)
-	lm.opsLogMut.Unlock()
 	lm.wLockMut.Unlock()
+	lm.opsLogMut.Unlock()
 	return nil
 }

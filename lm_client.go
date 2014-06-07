@@ -25,6 +25,7 @@ type LManagerClient struct {
 	WLocks map[string]*WLockVal //  Map of <keys, WriteLock Values>
 
 	rLockMut sync.Mutex // Mutex lock for synchronizing access to RLocks map
+	wLockMut sync.Mutex // Mutex lock for synchronizing access to WLocks map
 
 	// Implements:
 	LMClientIntf
@@ -89,11 +90,15 @@ func (lm *LManagerClient) WLock(key string, version uint, timeout uint) (uint, e
 	if err != nil {
 		return ver, fmt.Errorf("Cannot get the write lock ", err)
 	}
+	lm.wLockMut.Lock()
 	lm.WLocks[key] = &WLockVal{lockID: retLockID, version: ver, timeout: timeout}
+	lm.wLockMut.Unlock()
 	return ver, nil
 }
 
 func (lm *LManagerClient) CommitWLock(key string, version uint) error {
+	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	wLockVal := lm.WLocks[key]
 	if wLockVal == nil {
 		return fmt.Errorf("Cannot find lock to be committed in local writeLocks cache")
@@ -114,6 +119,8 @@ func (lm *LManagerClient) CommitWLock(key string, version uint) error {
 }
 
 func (lm *LManagerClient) AbortWLock(key string, version uint) error {
+	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	wLockVal := lm.WLocks[key]
 	if wLockVal == nil {
 		return fmt.Errorf("Cannot find lock to be committed in local writeLocks cache")
