@@ -10,7 +10,9 @@ type tcpBodyLMRLockReq struct {
 type tcpBodyLMRLockResp struct {
 	LockId  string
 	Version uint
-	Err     error
+
+	// Extends:
+	tcpResponseImpl
 }
 
 type tcpBodyLMWLockReq struct {
@@ -25,7 +27,9 @@ type tcpBodyLMWLockResp struct {
 	LockId  string
 	Version uint
 	Timeout uint
-	Err     error
+
+	// Extends:
+	tcpResponseImpl
 }
 
 type tcpBodyLMCommitWLockReq struct {
@@ -36,7 +40,10 @@ type tcpBodyLMCommitWLockReq struct {
 }
 
 type tcpBodyLMCommitWLockResp struct {
-	Err error
+	Dummy bool
+
+	// Extends:
+	tcpResponseImpl
 }
 
 type tcpBodyLMAbortWLockReq struct {
@@ -47,7 +54,10 @@ type tcpBodyLMAbortWLockReq struct {
 }
 
 type tcpBodyLMAbortWLockResp struct {
-	Err error
+	Dummy bool
+
+	// Extends:
+	tcpResponseImpl
 }
 
 type tcpBodyLMInvalidateRLockReq struct {
@@ -56,5 +66,8 @@ type tcpBodyLMInvalidateRLockReq struct {
 }
 
 type tcpBodyLMInvalidateRLockResp struct {
-	Err error
+	Dummy bool
+
+	// Extends:
+	tcpResponseImpl
 }

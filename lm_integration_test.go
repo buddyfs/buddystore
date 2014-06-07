@@ -161,9 +161,9 @@ func TestWLockTimeTicker(t *testing.T) {
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, err := lm.WLock(TEST_KEY, 0, 2)
 	err = lm.CommitWLock(TEST_KEY, version)
-    if err != nil {
-        t.Fatalf("Commit failed : ", err)
-    }
+	if err != nil {
+		t.Fatalf("Commit failed : ", err)
+	}
 	readVersion, err := lm.RLock(TEST_KEY, true)
 	if readVersion != 1 {
 		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
@@ -174,7 +174,7 @@ func TestWLockTimeTicker(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected : WLock should not be committed due to timeout")
 	}
-    t.Log(err)
+	t.Log(err)
 	r.Shutdown()
 }
 

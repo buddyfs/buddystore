@@ -95,3 +95,108 @@ func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
 	r.AssertExpectations(t)
 	lm.AssertExpectations(t)
 }
+
+func TestKVSetWriteLockedKey(t *testing.T) {
+	_, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	bar := []byte("bar")
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, fmt.Errorf("Key write locked")).Once()
+
+	err := kvsClient.Set(TEST_KEY, bar)
+	assert.Error(t, err, "Write-locked key")
+
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVSetWithRingErrors(t *testing.T) {
+	_, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	bar := []byte("bar")
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return(nil, fmt.Errorf("Lookup failed")).Once()
+
+	err := kvsClient.Set(TEST_KEY, bar)
+	assert.Error(t, err, "Could not read data")
+
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]Vnode{}, nil).Once()
+
+	err = kvsClient.Set(TEST_KEY, bar)
+	assert.Error(t, err, "Could not read data")
+
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVSetAndAbort(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	bar := []byte("bar")
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+	tr.On("Set", vnode1, TEST_KEY, uint(1), bar).Return(fmt.Errorf("Node read error")).Once()
+
+	// Abort command is strictly not necessary here.
+	// In case the test breaks, check if the Abort command is being
+	// sent in an async goroutine, because thaat is a possible optimization.
+	lm.On("AbortWLock", TEST_KEY, uint(1)).Return(1, nil).Once()
+
+	err := kvsClient.Set(TEST_KEY, bar)
+	assert.Error(t, err, "Could not read data")
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVSetAndCommitFailed(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	bar := []byte("bar")
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+	tr.On("Set", vnode1, TEST_KEY, uint(1), bar).Return(nil).Once()
+	lm.On("CommitWLock", TEST_KEY, uint(1)).Return(fmt.Errorf("Commit failed")).Once()
+
+	err := kvsClient.Set(TEST_KEY, bar)
+	assert.Error(t, err, "Could not read data")
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVSetAndCommitSucceeded(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	bar := []byte("bar")
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("WLock", TEST_KEY, uint(0), uint(10)).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+	tr.On("Set", vnode1, TEST_KEY, uint(1), bar).Return(nil).Once()
+	lm.On("CommitWLock", TEST_KEY, uint(1)).Return(nil).Once()
+
+	err := kvsClient.Set(TEST_KEY, bar)
+	assert.NoError(t, err, "Commit succeeded")
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
