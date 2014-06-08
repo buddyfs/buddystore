@@ -53,8 +53,8 @@ func (mv *MockVnodeRPC) BulkSet(key string, valLst []KVStoreValue) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) SyncKeys(key string, ver []uint) (string, []uint, error) {
-	return key, nil, nil
+func (mv *MockVnodeRPC) SyncKeys(owner *Vnode, key string, ver []uint) error {
+	return nil
 }
 
 func (mv *MockVnodeRPC) PurgeVersions(key string, maxVersion uint) error {

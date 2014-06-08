@@ -54,17 +54,28 @@ func (kvs *KVStore) incSyncToSucc(succVn *Vnode, key string, version uint, value
 	tokens <- true
 }
 
-func (kvs *KVStore) syncKeys(key string, ver []uint) (string, []uint, error) {
+func (kvs *KVStore) syncKeys(owner *Vnode, key string, ver []uint) error {
+
+	go kvs.handleSyncKeys(owner, key, ver)
+
+	return nil
+}
+
+func (kvs *KVStore) handleSyncKeys(owner *Vnode, key string, ver []uint) {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
 
 	var present bool
 	var retVer []uint
 
+	if owner == nil {
+		return
+	}
+
 	kvLst, found := kvs.kv[key]
 
 	if !found {
-		return key, ver, nil
+		return
 	}
 
 	retVer = make([]uint, 0, len(ver))
@@ -84,5 +95,11 @@ func (kvs *KVStore) syncKeys(key string, ver []uint) (string, []uint, error) {
 		}
 	}
 
-	return key, retVer, nil
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(owner)
+
+	if !ok {
+		// kvs.vn.ring.transport.(*LocalTransport).remote.MissingKeys(owner, key, retVer)
+	}
+
+	return
 }

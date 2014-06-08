@@ -414,14 +414,14 @@ func (t *TCPTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue)
 	}
 }
 
-func (t *TCPTransport) SyncKeys(target *Vnode, key string, ver []uint) (string, []uint, error) {
-	resp := tcpBodyRespSyncKeys{}
-	err := t.networkCall(target.Host, tcpSyncKeys, tcpBodySyncKeys{Vnode: target, Key: key, Version: ver}, &resp)
+func (t *TCPTransport) SyncKeys(target *Vnode, owner *Vnode, key string, ver []uint) error {
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpSyncKeys, tcpBodySyncKeys{Vnode: target, Owner: owner, Key: key, Version: ver}, &resp)
 
 	if err != nil {
-		return key, nil, err
+		return err
 	} else {
-		return resp.Key, resp.Version, nil
+		return nil
 	}
 }
 
@@ -920,12 +920,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 
 			// Generate a response
 			obj, ok := t.get(body.Vnode)
-			resp := tcpBodyRespSyncKeys{}
+			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				key, ver, err := obj.SyncKeys(body.Key, body.Version)
-				resp.Key = key
-				resp.Version = ver
+				err := obj.SyncKeys(body.Owner, body.Key, body.Version)
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",

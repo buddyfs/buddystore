@@ -81,7 +81,7 @@ func (mt *MockTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValu
 	panic("Mock method not implemented")
 }
 
-func (mt *MockTransport) SyncKeys(target *Vnode, key string, ver []uint) (string, []uint, error) {
+func (mt *MockTransport) SyncKeys(target *Vnode, owner *Vnode, key string, ver []uint) error {
 	panic("Mock method not implemented")
 }
 

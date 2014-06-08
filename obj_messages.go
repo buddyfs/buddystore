@@ -26,6 +26,13 @@ type tcpBodyBulkSet struct {
 
 type tcpBodySyncKeys struct {
 	Vnode   *Vnode
+	Owner   *Vnode
+	Key     string
+	Version []uint
+}
+
+type tcpBodyMissingKeys struct {
+	Vnode   *Vnode
 	Key     string
 	Version []uint
 }
@@ -46,15 +53,6 @@ type tcpBodyRespValue struct {
 
 type tcpBodyRespKeys struct {
 	Keys []string
-
-	// Extends:
-	tcpResponseImpl
-}
-
-type tcpBodyRespSyncKeys struct {
-	Vnode   *Vnode
-	Key     string
-	Version []uint
 
 	// Extends:
 	tcpResponseImpl
