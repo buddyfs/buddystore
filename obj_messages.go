@@ -26,13 +26,14 @@ type tcpBodyBulkSet struct {
 
 type tcpBodySyncKeys struct {
 	Vnode   *Vnode
-	Owner   *Vnode
+	OwnerVn *Vnode
 	Key     string
 	Version []uint
 }
 
 type tcpBodyMissingKeys struct {
 	Vnode   *Vnode
+	ReplVn  *Vnode
 	Key     string
 	Version []uint
 }

@@ -247,14 +247,24 @@ func (lt *LocalTransport) BulkSet(target *Vnode, key string, valLst []KVStoreVal
 	return vnodeRpc.BulkSet(key, valLst)
 }
 
-func (lt *LocalTransport) SyncKeys(target *Vnode, owner *Vnode, key string, ver []uint) error {
+func (lt *LocalTransport) SyncKeys(target *Vnode, ownerVn *Vnode, key string, ver []uint) error {
 	vnodeRpc, ok := lt.get(target)
 
 	if !ok {
-		return lt.remote.SyncKeys(target, owner, key, ver)
+		return lt.remote.SyncKeys(target, ownerVn, key, ver)
 	}
 
-	return vnodeRpc.SyncKeys(owner, key, ver)
+	return vnodeRpc.SyncKeys(ownerVn, key, ver)
+}
+
+func (lt *LocalTransport) MissingKeys(target *Vnode, ownerVn *Vnode, key string, ver []uint) error {
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.MissingKeys(target, ownerVn, key, ver)
+	}
+
+	return vnodeRpc.MissingKeys(ownerVn, key, ver)
 }
 
 func (lt *LocalTransport) PurgeVersions(target *Vnode, key string, maxVersion uint) error {
@@ -347,7 +357,11 @@ func (*BlackholeTransport) BulkSet(v *Vnode, key string, valLst []KVStoreValue) 
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) SyncKeys(v *Vnode, owner *Vnode, key string, ver []uint) error {
+func (*BlackholeTransport) SyncKeys(v *Vnode, ownerVn *Vnode, key string, ver []uint) error {
+	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) MissingKeys(v *Vnode, replVn *Vnode, key string, ver []uint) error {
 	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 

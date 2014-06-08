@@ -436,8 +436,14 @@ func (vn *localVnode) BulkSet(key string, valLst []KVStoreValue) error {
 	return err
 }
 
-func (vn *localVnode) SyncKeys(owner *Vnode, key string, ver []uint) error {
-	err := vn.store.syncKeys(owner, key, ver)
+func (vn *localVnode) SyncKeys(ownerVn *Vnode, key string, ver []uint) error {
+	err := vn.store.syncKeys(ownerVn, key, ver)
+
+	return err
+}
+
+func (vn *localVnode) MissingKeys(replVn *Vnode, key string, ver []uint) error {
+	err := vn.store.missingKeys(replVn, key, ver)
 
 	return err
 }

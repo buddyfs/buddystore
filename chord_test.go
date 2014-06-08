@@ -142,7 +142,11 @@ func (ml *MultiLocalTrans) BulkSet(target *Vnode, key string, valLst []KVStoreVa
 	return nil
 }
 
-func (ml *MultiLocalTrans) SyncKeys(target *Vnode, owner *Vnode, key string, ver []uint) error {
+func (ml *MultiLocalTrans) SyncKeys(target *Vnode, ownerVn *Vnode, key string, ver []uint) error {
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) MissingKeys(target *Vnode, replVn *Vnode, key string, ver []uint) error {
 	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 

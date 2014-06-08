@@ -59,6 +59,7 @@ const (
 	tcpList
 	tcpBulkSet
 	tcpSyncKeys
+	tcpMissingKeys
 	tcpPurgeVersions
 	tcpRLockReq
 	tcpWLockReq
@@ -414,9 +415,20 @@ func (t *TCPTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue)
 	}
 }
 
-func (t *TCPTransport) SyncKeys(target *Vnode, owner *Vnode, key string, ver []uint) error {
+func (t *TCPTransport) SyncKeys(target *Vnode, ownerVn *Vnode, key string, ver []uint) error {
 	resp := tcpBodyError{}
-	err := t.networkCall(target.Host, tcpSyncKeys, tcpBodySyncKeys{Vnode: target, Owner: owner, Key: key, Version: ver}, &resp)
+	err := t.networkCall(target.Host, tcpSyncKeys, tcpBodySyncKeys{Vnode: target, OwnerVn: ownerVn, Key: key, Version: ver}, &resp)
+
+	if err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (t *TCPTransport) MissingKeys(target *Vnode, replVn *Vnode, key string, ver []uint) error {
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpMissingKeys, tcpBodyMissingKeys{Vnode: target, ReplVn: replVn, Key: key, Version: ver}, &resp)
 
 	if err != nil {
 		return err
@@ -923,7 +935,26 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				err := obj.SyncKeys(body.Owner, body.Key, body.Version)
+				err := obj.SyncKeys(body.OwnerVn, body.Key, body.Version)
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpMissingKeys:
+			body := tcpBodyMissingKeys{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyError{}
+			sendResp = &resp
+			if ok {
+				err := obj.MissingKeys(body.ReplVn, body.Key, body.Version)
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",

@@ -54,21 +54,21 @@ func (kvs *KVStore) incSyncToSucc(succVn *Vnode, key string, version uint, value
 	tokens <- true
 }
 
-func (kvs *KVStore) syncKeys(owner *Vnode, key string, ver []uint) error {
+func (kvs *KVStore) syncKeys(ownerVn *Vnode, key string, ver []uint) error {
 
-	go kvs.handleSyncKeys(owner, key, ver)
+	go kvs.handleSyncKeys(ownerVn, key, ver)
 
 	return nil
 }
 
-func (kvs *KVStore) handleSyncKeys(owner *Vnode, key string, ver []uint) {
+func (kvs *KVStore) handleSyncKeys(ownerVn *Vnode, key string, ver []uint) {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
 
 	var present bool
 	var retVer []uint
 
-	if owner == nil {
+	if ownerVn == nil {
 		return
 	}
 
@@ -95,10 +95,55 @@ func (kvs *KVStore) handleSyncKeys(owner *Vnode, key string, ver []uint) {
 		}
 	}
 
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(owner)
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(ownerVn)
 
 	if !ok {
-		// kvs.vn.ring.transport.(*LocalTransport).remote.MissingKeys(owner, key, retVer)
+		kvs.vn.ring.transport.(*LocalTransport).remote.MissingKeys(ownerVn, &kvs.vn.Vnode, key, retVer)
+	}
+
+	return
+}
+
+func (kvs *KVStore) missingKeys(replVn *Vnode, key string, ver []uint) error {
+
+	go kvs.handleMissingKeys(replVn, key, ver)
+
+	return nil
+}
+
+func (kvs *KVStore) handleMissingKeys(replVn *Vnode, key string, ver []uint) {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
+
+	var valueLst []KVStoreValue
+
+	if replVn == nil {
+		return
+	}
+
+	kvLst, found := kvs.kv[key]
+
+	if !found {
+		return
+	}
+
+	valueLst = make([]KVStoreValue, 0, len(ver))
+
+	for _, version := range ver {
+
+		for i := kvLst.Front(); i != nil; i = i.Next() {
+			if i.Value.(*KVStoreValue).Ver == version {
+				kvVal := KVStoreValue{Ver: version, Val: i.Value.(*KVStoreValue).Val}
+				valueLst = append(valueLst, kvVal)
+				break
+			}
+		}
+	}
+
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(replVn)
+
+	if !ok {
+		kvs.vn.ring.transport.(*LocalTransport).remote.BulkSet(replVn, key, valueLst)
 	}
 
 	return

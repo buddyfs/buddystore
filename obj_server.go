@@ -31,6 +31,7 @@ type KVStoreIntf interface {
 	bulkSet(string, []KVStoreValue) error
 	syncKeys(*Vnode, string, []uint) error
 	handleSyncKeys(*Vnode, string, []uint) error
+	missingKeys(*Vnode, string, []uint) error
 	purgeVersions(string, uint) error
 	incSync(string, uint, []byte) error
 	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)

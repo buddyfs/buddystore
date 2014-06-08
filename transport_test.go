@@ -53,7 +53,11 @@ func (mv *MockVnodeRPC) BulkSet(key string, valLst []KVStoreValue) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) SyncKeys(owner *Vnode, key string, ver []uint) error {
+func (mv *MockVnodeRPC) SyncKeys(ownerVn *Vnode, key string, ver []uint) error {
+	return nil
+}
+
+func (mv *MockVnodeRPC) MissingKeys(replVn *Vnode, key string, ver []uint) error {
 	return nil
 }
 
