@@ -18,6 +18,10 @@ func (mt *MockTransport) GetPredecessor(*Vnode) (*Vnode, error) {
 	panic("Mock method not implemented")
 }
 
+func (mt *MockTransport) GetPredecessorList(*Vnode) ([]*Vnode, error) {
+	panic("Mock method not implemented")
+}
+
 func (mt *MockTransport) Notify(target, self *Vnode) ([]*Vnode, error) {
 	panic("Mock method not implemented")
 }

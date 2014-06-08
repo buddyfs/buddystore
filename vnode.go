@@ -150,6 +150,11 @@ func (vn *localVnode) GetPredecessor() (*Vnode, error) {
 	return vn.predecessor, nil
 }
 
+// RPC: Invoked to return out predecessor list
+func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
+	return vn.predecessors, nil
+}
+
 // Notifies our successor of us, updates successor list
 func (vn *localVnode) notifySuccessor() error {
 	// Notify successor

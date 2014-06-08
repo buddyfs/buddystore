@@ -84,6 +84,14 @@ func (ml *MultiLocalTrans) SkipSuccessor(target, self *Vnode) error {
 	return ml.remote.SkipSuccessor(target, self)
 }
 
+// Request a nodes predecessor list
+func (ml *MultiLocalTrans) GetPredecessorList(v *Vnode) ([]*Vnode, error) {
+	if local, ok := ml.hosts[v.Host]; ok {
+		return local.GetPredecessorList(v)
+	}
+	return ml.remote.GetPredecessorList(v)
+}
+
 func (ml *MultiLocalTrans) Register(v *Vnode, o VnodeRPC) {
 	local, ok := ml.hosts[v.Host]
 	if !ok {

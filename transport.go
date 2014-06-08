@@ -96,6 +96,19 @@ func (lt *LocalTransport) GetPredecessor(vn *Vnode) (*Vnode, error) {
 	return lt.remote.GetPredecessor(vn)
 }
 
+func (lt *LocalTransport) GetPredecessorList(vn *Vnode) ([]*Vnode, error) {
+	// Look for it locally
+	obj, ok := lt.get(vn)
+
+	// If it exists locally, handle it
+	if ok {
+		return obj.GetPredecessorList()
+	}
+
+	// Pass onto remote
+	return lt.remote.GetPredecessorList(vn)
+}
+
 func (lt *LocalTransport) Notify(vn, self *Vnode) ([]*Vnode, error) {
 	// Look for it locally
 	obj, ok := lt.get(vn)
@@ -303,6 +316,10 @@ func (*BlackholeTransport) Ping(vn *Vnode) (bool, error) {
 }
 
 func (*BlackholeTransport) GetPredecessor(vn *Vnode) (*Vnode, error) {
+	return nil, fmt.Errorf("Failed to connect! Blackhole: %s.", vn.String())
+}
+
+func (*BlackholeTransport) GetPredecessorList(vn *Vnode) ([]*Vnode, error) {
 	return nil, fmt.Errorf("Failed to connect! Blackhole: %s.", vn.String())
 }
 

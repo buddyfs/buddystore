@@ -34,6 +34,9 @@ type Transport interface {
 	// Instructs a node to skip a given successor. Used to leave.
 	SkipSuccessor(target, self *Vnode) error
 
+	// Get the list of predecessors
+	GetPredecessorList(*Vnode) ([]*Vnode, error)
+
 	// Register for an RPC callbacks
 	Register(*Vnode, VnodeRPC)
 
@@ -74,6 +77,7 @@ type VnodeRPC interface {
 	FindSuccessors(int, []byte) ([]*Vnode, error)
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
+	GetPredecessorList() ([]*Vnode, error)
 
 	// KV Store operations
 	Get(key string, version uint) ([]byte, error)
@@ -127,17 +131,18 @@ type Vnode struct {
 // Represents a local Vnode
 type localVnode struct {
 	Vnode
-	ring        *Ring
-	successors  []*Vnode
-	finger      []*Vnode
-	last_finger int
-	predecessor *Vnode
-	stabilized  time.Time
-	timer       *time.Timer
-	store       *KVStore
-	lm          *LManager
-	lm_client   *LManagerClient
-	tracker     Tracker
+	ring         *Ring
+	successors   []*Vnode
+	predecessors []*Vnode
+	finger       []*Vnode
+	last_finger  int
+	predecessor  *Vnode
+	stabilized   time.Time
+	timer        *time.Timer
+	store        *KVStore
+	lm           *LManager
+	lm_client    *LManagerClient
+	tracker      Tracker
 }
 
 type RingIntf interface {
