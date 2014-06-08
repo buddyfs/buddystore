@@ -4,6 +4,18 @@ import (
 	"sync"
 )
 
+const (
+	MaxIncSyncParallelism = 8
+)
+
+func (kvs *KVStore) localRepl() {
+	return
+}
+
+func (kvs *KVStore) globalRepl() {
+	return
+}
+
 func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 	var wg sync.WaitGroup
 	var tokens chan bool

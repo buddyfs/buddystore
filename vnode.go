@@ -97,6 +97,9 @@ func (vn *localVnode) stabilize() {
 
 	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
 
+	go vn.store.localRepl()
+	go vn.store.globalRepl()
+
 	// Set the last stabilized time
 	vn.stabilized = time.Now()
 }

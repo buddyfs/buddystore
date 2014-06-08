@@ -6,10 +6,6 @@ import (
 	"sync"
 )
 
-const (
-	MaxIncSyncParallelism = 8
-)
-
 type KVStoreValue struct {
 	Ver uint   // version
 	Val []byte // value
@@ -39,8 +35,8 @@ type KVStoreIntf interface {
 	incSync(string, uint, []byte) error
 	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)
 	updatePredSuccList([]*Vnode, []*Vnode) error
-	//       localReplMaintenance([]*Vnode, []*Vnode)
-	//      globalReplMaintenance([]*Vnode)
+	localRepl()
+	globalRepl()
 }
 
 func (kvs *KVStore) init() error {
