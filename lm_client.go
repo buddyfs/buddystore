@@ -72,7 +72,7 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 		return 0, err
 	}
 	/* TODO : Discuss : Extract nodeID and send it to server side. Where to get that info*/
-	retLockID, ver, err := lm.Ring.transport.RLock(LMVnodes[0], key, "testNodeID")
+	retLockID, ver, err := lm.Ring.transport.RLock(LMVnodes[0], key, lm.Ring.vnodes[0].String())
 	if err != nil {
 		return 0, fmt.Errorf("Cannot get ReadLock due to ", err)
 	}

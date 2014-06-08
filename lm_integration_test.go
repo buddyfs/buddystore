@@ -79,16 +79,15 @@ func TestAbortLock(t *testing.T) {
 	}
 	version, _ = lm.WLock(TEST_KEY, 2, 10)
 	_ = lm.CommitWLock(TEST_KEY, version)
-	/*
-			readVersion, _ = lm.RLock(TEST_KEY, true)
-			if readVersion != 2 {
-				t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
-			}
-			version, _ = lm.WLock(TEST_KEY, 3, 10)
-		    err := lm.AbortWLock(TEST_KEY, version)
-			if err != nil {
-				t.Fatalf("Error while trying to Abort a write lock : ", err)
-			}*/
+	readVersion, _ = lm.RLock(TEST_KEY, true)
+	if readVersion != 2 {
+		t.Fatalf("Version mismatch : Expected version 2, got ", readVersion, " instead")
+	}
+	version, _ = lm.WLock(TEST_KEY, 3, 10)
+	err := lm.AbortWLock(TEST_KEY, version)
+	if err != nil {
+		t.Fatalf("Error while trying to Abort a write lock : ", err)
+	}
 
 	readVersion, _ = lm.RLock(TEST_KEY, true)
 	if readVersion != 2 {
@@ -246,6 +245,7 @@ func TestRLockInvalidate(t *testing.T) {
 	ml2 := InitLocalTransport(t2)
 
 	conf := fastConf()
+	conf.NumVnodes = 1
 	conf.Hostname = "localhost:10000" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
 	if err != nil {
