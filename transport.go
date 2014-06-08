@@ -227,6 +227,16 @@ func (lt *LocalTransport) List(target *Vnode) ([]string, error) {
 	return vnodeRpc.List()
 }
 
+func (lt *LocalTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.BulkSet(target, key, valLst)
+	}
+
+	return vnodeRpc.BulkSet(key, valLst)
+}
+
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {
@@ -291,4 +301,8 @@ func (*BlackholeTransport) Set(v *Vnode, key string, version uint, value []byte)
 
 func (*BlackholeTransport) List(v *Vnode) ([]string, error) {
 	return nil, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+}
+
+func (*BlackholeTransport) BulkSet(v *Vnode, key string, valLst []KVStoreValue) error {
+	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }

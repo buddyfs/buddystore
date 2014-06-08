@@ -398,6 +398,12 @@ func (vn *localVnode) List() ([]string, error) {
 	return keys, err
 }
 
+func (vn *localVnode) BulkSet(key string, valLst []KVStoreValue) error {
+	err := vn.store.bulkSet(key, valLst)
+
+	return err
+}
+
 func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
 	err := vn.store.purgeVersions(key, maxVersion)
 

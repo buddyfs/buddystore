@@ -57,6 +57,7 @@ const (
 	tcpGet
 	tcpSet
 	tcpList
+	tcpBulkSet
 	tcpRLockReq
 	tcpWLockReq
 	tcpCommitWLockReq
@@ -115,6 +116,12 @@ type tcpBodySet struct {
 
 type tcpBodyList struct {
 	Vnode *Vnode
+}
+
+type tcpBodyBulkSet struct {
+	Vnode    *Vnode
+	Key      string
+	ValueLst []KVStoreValue
 }
 
 /* TCP body for KV store responses */
@@ -644,6 +651,57 @@ func (t *TCPTransport) List(target *Vnode) ([]string, error) {
 		return make([]string, 0), err
 	case _ = <-respChan:
 		return resp.Keys, nil
+	}
+
+}
+
+func (t *TCPTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
+	// Get a conn
+	out, err := t.getConn(target.Host)
+	if err != nil {
+		return err
+	}
+
+	respChan := make(chan bool, 1)
+	errChan := make(chan error, 1)
+
+	resp := tcpBodyError{}
+
+	go func() {
+		out.header.ReqType = tcpBulkSet
+		if err := out.enc.Encode(&out.header); err != nil {
+			errChan <- err
+			return
+		}
+		body := tcpBodyBulkSet{Vnode: target, Key: key, ValueLst: valLst}
+
+		if err := out.enc.Encode(&body); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Read in the response
+		if err := out.dec.Decode(&resp); err != nil {
+			errChan <- err
+			return
+		}
+
+		// Return the connection
+		t.returnConn(out)
+		if resp.Err == nil {
+			respChan <- true
+		} else {
+			errChan <- resp.Err
+		}
+	}()
+
+	select {
+	case <-time.After(t.timeout):
+		return fmt.Errorf("Command timed out!")
+	case err := <-errChan:
+		return err
+	case _ = <-respChan:
+		return nil
 	}
 
 }
@@ -1265,6 +1323,26 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				keys, err := obj.List()
 				resp.Keys = keys
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpBulkSet:
+			body := tcpBodyBulkSet{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyError{}
+			sendResp = &resp
+			if ok {
+				err := obj.BulkSet(body.Key, body.ValueLst)
+
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
