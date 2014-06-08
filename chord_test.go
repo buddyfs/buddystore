@@ -206,7 +206,6 @@ func TestJoin(t *testing.T) {
 }
 
 /* Added to check the case when the "created" ring has only one vnode */
-/* TODO : Fixing
 func TestSingleNodeJoin(t *testing.T) {
 	// Create a multi transport
 	ml := InitMLTransport("", nil)
@@ -231,7 +230,6 @@ func TestSingleNodeJoin(t *testing.T) {
 	r.Shutdown()
 	r2.Shutdown()
 }
-*/
 
 func TestJoinDeadHost(t *testing.T) {
 	// Create a multi transport

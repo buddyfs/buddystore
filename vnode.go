@@ -94,7 +94,12 @@ func (vn *localVnode) checkNewSuccessor() error {
 	trans := vn.ring.transport
 
 CHECK_NEW_SUC:
-	succ := vn.successors[0]
+	succ := &Vnode{}
+	if len(vn.ring.vnodes) == 1 {
+		succ = &vn.Vnode
+	} else {
+		succ = vn.successors[0]
+	}
 	if succ == nil {
 		panic("Node has no successor!")
 	}
@@ -144,7 +149,12 @@ func (vn *localVnode) GetPredecessor() (*Vnode, error) {
 // Notifies our successor of us, updates successor list
 func (vn *localVnode) notifySuccessor() error {
 	// Notify successor
-	succ := vn.successors[0]
+	succ := &Vnode{}
+	if len(vn.ring.vnodes) == 1 {
+		succ = &vn.Vnode
+	} else {
+		succ = vn.successors[0]
+	}
 	succ_list, err := vn.ring.transport.Notify(succ, &vn.Vnode)
 	if err != nil {
 		return err
@@ -251,6 +261,12 @@ func (vn *localVnode) checkPredecessor() error {
 // Finds next N successors. N must be <= NumSuccessors
 func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 	// Check if we are the immediate predecessor
+	if len(vn.ring.vnodes) == 1 { //  Send the same vnode as the only successor
+		vnodes := make([]*Vnode, 1)
+		vnodes[0] = &vn.Vnode
+		return vnodes, nil
+	}
+
 	if betweenRightIncl(vn.Id, vn.successors[0].Id, key) {
 		return vn.successors[:n], nil
 	}
@@ -330,6 +346,9 @@ func (vn *localVnode) ClearPredecessor(p *Vnode) error {
 
 // Used to skip a successor when a node is leaving
 func (vn *localVnode) SkipSuccessor(s *Vnode) error {
+	if vn.successors[0] == nil {
+		return nil
+	}
 	// Skip if we have a match
 	if vn.successors[0].String() == s.String() {
 		// Inform the delegate
