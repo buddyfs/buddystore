@@ -24,6 +24,8 @@ type LocalTransport struct {
 	Transport
 }
 
+var _ Transport = new(LocalTransport)
+
 // Creates a local transport to wrap a remote transport
 func InitLocalTransport(remote Transport) Transport {
 	// Replace a nil transport with black hole
@@ -243,6 +245,16 @@ func (lt *LocalTransport) BulkSet(target *Vnode, key string, valLst []KVStoreVal
 	}
 
 	return vnodeRpc.BulkSet(key, valLst)
+}
+
+func (lt *LocalTransport) JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error) {
+	vnodeRpc, ok := lt.get(target)
+
+	if !ok {
+		return lt.remote.JoinRing(target, ringId, self)
+	}
+
+	return vnodeRpc.JoinRing(ringId, self)
 }
 
 // BlackholeTransport is used to provide an implemenation of the Transport that

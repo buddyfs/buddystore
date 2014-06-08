@@ -84,6 +84,10 @@ type VnodeRPC interface {
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
 	InvalidateRLock(lockID string) error
+
+	// Tracker operations
+	JoinRing(ringId string, self *Vnode) ([]*Vnode, error)
+	LeaveRing(ringId string) error
 }
 
 // Delegate to notify on ring events
@@ -127,6 +131,7 @@ type localVnode struct {
 	store       *KVStore
 	lm          *LManager
 	lm_client   *LManagerClient
+	tracker     Tracker
 }
 
 type RingIntf interface {
@@ -285,4 +290,10 @@ func (r *Ring) GetNumSuccessors() int {
 
 func (r *Ring) GetRingId() string {
 	return r.config.RingId
+}
+
+func (r *Ring) GetLocalVnode() *Vnode {
+	// TODO: Questionable code
+	// Is vnodes[0] always going to be a local node?
+	return &r.vnodes[0].Vnode
 }

@@ -64,15 +64,24 @@ func (bs *BuddyStore) init() error {
 
 	// Join my own ring
 	ring, err := bs.Tracker.JoinRing(bs.Config.MyID, bs.GlobalRing.GetLocalVnode())
-
 	if err != nil {
-		bs.SubRings[bs.Config.MyID] = ring
-		bs.LockManagers[bs.Config.MyID] = &LManagerClient{Ring: ring, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+		// If I'm not able to join my own ring, bail
+		return err
+	} else {
+		bs.addRing(bs.Config.MyID, ring)
 	}
 
-	// Join my friends' rings
+	// Any errors from this point on will not prevent initialization
+	// from completing successfully.
 
-	panic("TODO: BuddyStore.Init")
+	// Join my friends' rings
+	for _, friend := range bs.Config.Friends {
+		ring, err := bs.Tracker.JoinRing(friend, bs.GlobalRing.GetLocalVnode())
+
+		if err != nil {
+			bs.addRing(friend, ring)
+		}
+	}
 
 	bs.initalized = true
 	return nil
@@ -103,7 +112,13 @@ func NewBuddyStore(bsConfig *BuddyStoreConfig) *BuddyStore {
 		return nil
 	}
 
-	bs := &BuddyStore{Config: bsConfig, lock: sync.Mutex{}}
-	bs.init()
+	bs := &BuddyStore{Config: bsConfig, lock: sync.Mutex{}, SubRings: make(map[string]RingIntf), LockManagers: make(map[string]LMClientIntf)}
+	err := bs.init()
+
+	if err != nil {
+		// TODO: Should we retry initialization here?
+		glog.Errorf("Error while initializing buddystore: %s", err)
+	}
+
 	return bs
 }

@@ -72,6 +72,15 @@ func (mv *MockVnodeRPC) InvalidateRLock(lockID string) error {
 func (mv *MockVnodeRPC) AbortWLock(key string, version uint, nodeID string) error {
 	return nil
 }
+
+func (vn *MockVnodeRPC) JoinRing(ringId string, self *Vnode) ([]*Vnode, error) {
+	return nil, nil
+}
+
+func (vn *MockVnodeRPC) LeaveRing(ringId string) error {
+	return nil
+}
+
 func makeLocal() *LocalTransport {
 	return InitLocalTransport(nil).(*LocalTransport)
 }

@@ -30,6 +30,10 @@ func (vn *localVnode) init(idx int) {
 
 	// Initialise the key-value store
 	vn.store = &KVStore{vn: vn, kv: make(map[string]*list.List)}
+
+	// Initialize the tracker server
+	// TODO: Should we check this ring supports a tracker server?
+	vn.tracker = NewTracker()
 }
 
 // Schedules the Vnode to do regular maintenence
@@ -436,4 +440,12 @@ func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
 	err := vn.store.purgeVersions(key, maxVersion)
 
 	return err
+}
+
+func (vn *localVnode) JoinRing(ringId string, self *Vnode) ([]*Vnode, error) {
+	return vn.tracker.handleJoinRing(ringId, self)
+}
+
+func (vn *localVnode) LeaveRing(ringId string) error {
+	panic("TODO: localVnode.LeaveRing")
 }
