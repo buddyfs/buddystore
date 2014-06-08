@@ -253,7 +253,7 @@ func TestRLockInvalidate(t *testing.T) {
 	ml2 := InitLocalTransport(t2)
 
 	conf := fastConf()
-	conf.NumVnodes = 1
+	conf.NumVnodes = 2
 	conf.Hostname = "localhost:10000" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestRLockInvalidate(t *testing.T) {
 	}
 
 	conf2 := fastConf()
-	conf2.NumVnodes = 1
+	conf2.NumVnodes = 2
 	conf2.Hostname = "localhost:10001" //  I know where I reside
 	r2, err := Join(conf2, ml2, conf.Hostname)
 	time.Sleep(100 * time.Millisecond)
@@ -315,7 +315,7 @@ func TestLMDetector(t *testing.T) {
 			conf := fastConf()
 			conf.Hostname = fmt.Sprintf("localhost:%d", PORT+1020+i)
 			conf.RingId = "a"
-			conf.NumVnodes = 1
+			conf.NumVnodes = 2
 			if i != 0 {
 				r[i], err = Join(conf, ml, "localhost:10020")
 				time.Sleep(100 * time.Millisecond)
