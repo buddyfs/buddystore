@@ -1,7 +1,6 @@
 package buddystore
 
 import (
-	"container/list"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -30,7 +29,9 @@ func (vn *localVnode) init(idx int) {
 	vn.ring.transport.Register(&vn.Vnode, vn)
 
 	// Initialise the key-value store
-	vn.store = &KVStore{vn: vn, kv: make(map[string]*list.List)}
+	vn.store = &KVStore{}
+	vn.store.vn = vn
+	vn.store.init()
 
 	// Initialize the tracker server
 	// TODO: Should we check this ring supports a tracker server?
@@ -93,6 +94,8 @@ func (vn *localVnode) stabilize() {
 	if err := vn.updatePredecessorList(); err != nil {
 		log.Printf("[ERR] Error updating predecessor list: %s", err)
 	}
+
+	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
 
 	// Set the last stabilized time
 	vn.stabilized = time.Now()

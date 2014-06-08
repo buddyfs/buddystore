@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MaxReplicationParallelism = 8
+	MaxIncSyncParallelism = 8
 )
 
 type KVStoreValue struct {
@@ -16,15 +16,18 @@ type KVStoreValue struct {
 }
 
 type KVStore struct {
-	vn     *localVnode
-	kv     map[string]*list.List
-	kvLock sync.Mutex
+	vn        *localVnode
+	kv        map[string]*list.List
+	pred_list []*Vnode
+	succ_list []*Vnode
+	kvLock    sync.Mutex
 
 	// Implements:
 	KVStoreIntf
 }
 
 type KVStoreIntf interface {
+	init() error
 	get(string, uint) ([]byte, error)
 	set(string, uint, []byte) error
 	list() ([]byte, error)
@@ -35,6 +38,17 @@ type KVStoreIntf interface {
 	purgeVersions(string, uint) error
 	incSync(string, uint, []byte) error
 	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)
+	updatePredSuccList([]*Vnode, []*Vnode) error
+	//       localReplMaintenance([]*Vnode, []*Vnode)
+	//      globalReplMaintenance([]*Vnode)
+}
+
+func (kvs *KVStore) init() error {
+	kvs.kv = make(map[string]*list.List)
+	kvs.pred_list = make([]*Vnode, kvs.vn.ring.config.NumSuccessors)
+	kvs.succ_list = make([]*Vnode, kvs.vn.ring.config.NumSuccessors)
+
+	return nil
 }
 
 func (kvs *KVStore) get(key string, version uint) ([]byte, error) {
@@ -178,6 +192,16 @@ func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
 	if kvLst.Len() == 0 {
 		delete(kvs.kv, key)
 	}
+
+	return nil
+}
+
+func (kvs *KVStore) updatePredSuccList(pred_list []*Vnode, succ_list []*Vnode) error {
+	kvs.kvLock.Lock()
+	kvs.kvLock.Unlock()
+
+	copy(kvs.pred_list, pred_list)
+	copy(kvs.succ_list, succ_list)
 
 	return nil
 }

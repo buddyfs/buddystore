@@ -9,10 +9,10 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 	var tokens chan bool
 	var errs []error
 
-	tokens = make(chan bool, MaxReplicationParallelism)
+	tokens = make(chan bool, MaxIncSyncParallelism)
 	errs = make([]error, len(kvs.vn.successors))
 
-	for i := 0; i < MaxReplicationParallelism; i++ {
+	for i := 0; i < MaxIncSyncParallelism; i++ {
 		tokens <- true
 	}
 
