@@ -77,4 +77,8 @@ func (mt *MockTransport) List(target *Vnode) ([]string, error) {
 	panic("Mock method not implemented")
 }
 
+func (mt *MockTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
+	panic("Mock method not implemented")
+}
+
 var _ Transport = new(MockTransport)

@@ -57,6 +57,7 @@ type Transport interface {
 	Get(target *Vnode, key string, version uint) ([]byte, error)
 	Set(target *Vnode, key string, version uint, value []byte) error
 	List(target *Vnode) ([]string, error)
+	BulkSet(target *Vnode, key string, valLst []KVStoreValue) error
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -71,6 +72,7 @@ type VnodeRPC interface {
 	Get(key string, version uint) ([]byte, error)
 	Set(key string, version uint, value []byte) error
 	List() ([]string, error)
+	BulkSet(key string, valLst []KVStoreValue) error
 
 	// Lock Manager operations
 	RLock(key string, nodeID string, remoteAddr string) (string, uint, error)

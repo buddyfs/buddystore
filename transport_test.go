@@ -49,6 +49,10 @@ func (mv *MockVnodeRPC) List() ([]string, error) {
 	return nil, nil
 }
 
+func (mv *MockVnodeRPC) BulkSet(key string, valLst []KVStoreValue) error {
+	return nil
+}
+
 func (mv *MockVnodeRPC) RLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
 	return "", 0, nil
 }

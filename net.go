@@ -57,6 +57,7 @@ const (
 	tcpGet
 	tcpSet
 	tcpList
+	tcpBulkSet
 	tcpRLockReq
 	tcpWLockReq
 	tcpCommitWLockReq
@@ -135,39 +136,6 @@ type tcpBodyVnodeListError struct {
 
 type tcpBodyBoolError struct {
 	B bool
-
-	// Extends:
-	tcpResponseImpl
-}
-
-/* TCP body for KV store requests */
-type tcpBodyGet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-}
-
-type tcpBodySet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-	Value   []byte
-}
-
-type tcpBodyList struct {
-	Vnode *Vnode
-}
-
-/* TCP body for KV store responses */
-type tcpBodyRespValue struct {
-	Value []byte
-
-	// Extends:
-	tcpResponseImpl
-}
-
-type tcpBodyRespKeys struct {
-	Keys []string
 
 	// Extends:
 	tcpResponseImpl
@@ -430,6 +398,17 @@ func (t *TCPTransport) List(target *Vnode) ([]string, error) {
 		return nil, err
 	} else {
 		return resp.Keys, nil
+	}
+}
+
+func (t *TCPTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpBulkSet, tcpBodyBulkSet{Vnode: target, Key: key, ValueLst: valLst}, &resp)
+
+	if err != nil {
+		return err
+	} else {
+		return nil
 	}
 }
 
@@ -882,6 +861,26 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				keys, err := obj.List()
 				resp.Keys = keys
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpBulkSet:
+			body := tcpBodyBulkSet{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyError{}
+			sendResp = &resp
+			if ok {
+				err := obj.BulkSet(body.Key, body.ValueLst)
+
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",

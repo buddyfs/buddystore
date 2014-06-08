@@ -10,10 +10,9 @@ const (
 	MaxReplicationParallelism = 8
 )
 
-// New Vnode operations added for supporting KV store
 type KVStoreValue struct {
-	ver uint   // version
-	val []byte // value
+	Ver uint   // version
+	Val []byte // value
 }
 
 type KVStore struct {
@@ -29,6 +28,7 @@ type KVStoreIntf interface {
 	get(string, uint) ([]byte, error)
 	set(string, uint, []byte) error
 	list() ([]byte, error)
+	bulkSet(string, []KVStoreValue) error
 	purgeVersions(string, uint) error
 	incSync(string, uint, []byte) error
 	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)
@@ -45,8 +45,8 @@ func (kvs *KVStore) get(key string, version uint) ([]byte, error) {
 	} else {
 		for i := kvLst.Front(); i != nil; i = i.Next() {
 			// Found the key value matching the requested version
-			if i.Value.(*KVStoreValue).ver == version {
-				return i.Value.(*KVStoreValue).val, nil
+			if i.Value.(*KVStoreValue).Ver == version {
+				return i.Value.(*KVStoreValue).Val, nil
 			}
 		}
 
@@ -60,7 +60,7 @@ func (kvs *KVStore) set(key string, version uint, value []byte) error {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
 
-	kvVal := &KVStoreValue{ver: version, val: value}
+	kvVal := &KVStoreValue{Ver: version, Val: value}
 
 	kvLst, found := kvs.kv[key]
 
@@ -76,7 +76,7 @@ func (kvs *KVStore) set(key string, version uint, value []byte) error {
 		// Add a value only if the version is greater than the
 		// current max version
 		if curMaxVerVal != nil {
-			maxVer := curMaxVerVal.Value.(*KVStoreValue).ver
+			maxVer := curMaxVerVal.Value.(*KVStoreValue).Ver
 
 			if maxVer >= version {
 				return fmt.Errorf("Lower version than current max version")
@@ -104,6 +104,49 @@ func (kvs *KVStore) list() ([]string, error) {
 	return ret, nil
 }
 
+func (kvs *KVStore) bulkSet(key string, valLst []KVStoreValue) error {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
+
+	if len(valLst) == 0 {
+		return fmt.Errorf("Empty list of values")
+	}
+
+	kvLst, found := kvs.kv[key]
+
+	for _, val := range valLst {
+		kvVal := &KVStoreValue{Ver: val.Ver, Val: val.Val}
+
+		if !found {
+			// This is the first value being added to the list.
+			kvLst = list.New()
+			kvs.kv[key] = kvLst
+
+			kvLst.PushFront(kvVal)
+
+			found = true
+		} else {
+			curMaxVerVal := kvLst.Front()
+
+			// Add a value only if the version is greater than the
+			// current max version
+			if curMaxVerVal != nil {
+				maxVer := curMaxVerVal.Value.(*KVStoreValue).Ver
+
+				if maxVer >= val.Ver {
+					kvLst.PushBack(kvVal)
+				} else {
+					kvLst.PushFront(kvVal)
+				}
+			} else {
+				kvLst.PushFront(kvVal)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
@@ -118,7 +161,7 @@ func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
 
 	for i != nil {
 		// Remove all values with version less than the max version
-		if i.Value.(*KVStoreValue).ver < maxVersion {
+		if i.Value.(*KVStoreValue).Ver < maxVersion {
 			toBeDel := i
 			i = i.Next()
 			kvLst.Remove(toBeDel)

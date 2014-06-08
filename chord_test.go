@@ -130,6 +130,10 @@ func (ml *MultiLocalTrans) List(target *Vnode) ([]string, error) {
 	return nil, nil
 }
 
+func (ml *MultiLocalTrans) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
+	return nil
+}
+
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig("test")
 	if conf.Hostname != "test" {
