@@ -436,6 +436,12 @@ func (vn *localVnode) BulkSet(key string, valLst []KVStoreValue) error {
 	return err
 }
 
+func (vn *localVnode) SyncKeys(key string, ver []uint) (string, []uint, error) {
+	retKey, retVer, err := vn.store.syncKeys(key, ver)
+
+	return retKey, retVer, err
+}
+
 func (vn *localVnode) PurgeVersions(key string, maxVersion uint) error {
 	err := vn.store.purgeVersions(key, maxVersion)
 

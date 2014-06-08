@@ -142,6 +142,14 @@ func (ml *MultiLocalTrans) BulkSet(target *Vnode, key string, valLst []KVStoreVa
 	return nil
 }
 
+func (ml *MultiLocalTrans) SyncKeys(target *Vnode, key string, ver []uint) (string, []uint, error) {
+	return key, nil, fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) PurgeVersions(target *Vnode, key string, maxVersion uint) error {
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig("test")
 	if conf.Hostname != "test" {

@@ -58,6 +58,8 @@ const (
 	tcpSet
 	tcpList
 	tcpBulkSet
+	tcpSyncKeys
+	tcpPurgeVersions
 	tcpRLockReq
 	tcpWLockReq
 	tcpCommitWLockReq
@@ -404,6 +406,28 @@ func (t *TCPTransport) List(target *Vnode) ([]string, error) {
 func (t *TCPTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {
 	resp := tcpBodyError{}
 	err := t.networkCall(target.Host, tcpBulkSet, tcpBodyBulkSet{Vnode: target, Key: key, ValueLst: valLst}, &resp)
+
+	if err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (t *TCPTransport) SyncKeys(target *Vnode, key string, ver []uint) (string, []uint, error) {
+	resp := tcpBodyRespSyncKeys{}
+	err := t.networkCall(target.Host, tcpSyncKeys, tcpBodySyncKeys{Vnode: target, Key: key, Version: ver}, &resp)
+
+	if err != nil {
+		return key, nil, err
+	} else {
+		return resp.Key, resp.Version, nil
+	}
+}
+
+func (t *TCPTransport) PurgeVersions(target *Vnode, key string, maxVersion uint) error {
+	resp := tcpBodyError{}
+	err := t.networkCall(target.Host, tcpPurgeVersions, tcpBodyPurgeVersions{Vnode: target, Key: key, MaxVersion: maxVersion}, &resp)
 
 	if err != nil {
 		return err
@@ -881,6 +905,46 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				err := obj.BulkSet(body.Key, body.ValueLst)
 
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpSyncKeys:
+			body := tcpBodySyncKeys{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyRespSyncKeys{}
+			sendResp = &resp
+			if ok {
+				key, ver, err := obj.SyncKeys(body.Key, body.Version)
+				resp.Key = key
+				resp.Version = ver
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpPurgeVersions:
+			body := tcpBodyPurgeVersions{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vnode)
+			resp := tcpBodyError{}
+			sendResp = &resp
+			if ok {
+				err := obj.PurgeVersions(body.Key, body.MaxVersion)
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",

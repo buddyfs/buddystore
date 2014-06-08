@@ -58,6 +58,8 @@ type Transport interface {
 	Set(target *Vnode, key string, version uint, value []byte) error
 	List(target *Vnode) ([]string, error)
 	BulkSet(target *Vnode, key string, valLst []KVStoreValue) error
+	SyncKeys(target *Vnode, key string, ver []uint) (string, []uint, error)
+	PurgeVersions(target *Vnode, key string, maxVersion uint) error
 
 	// Tracker operations
 	JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error)
@@ -77,6 +79,8 @@ type VnodeRPC interface {
 	Set(key string, version uint, value []byte) error
 	List() ([]string, error)
 	BulkSet(key string, valLst []KVStoreValue) error
+	SyncKeys(key string, ver []uint) (string, []uint, error)
+	PurgeVersions(key string, maxVersion uint) error
 
 	// Lock Manager operations
 	RLock(key string, nodeID string, remoteAddr string) (string, uint, error)

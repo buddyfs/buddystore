@@ -24,6 +24,18 @@ type tcpBodyBulkSet struct {
 	ValueLst []KVStoreValue
 }
 
+type tcpBodySyncKeys struct {
+	Vnode   *Vnode
+	Key     string
+	Version []uint
+}
+
+type tcpBodyPurgeVersions struct {
+	Vnode      *Vnode
+	Key        string
+	MaxVersion uint
+}
+
 // TCP body for object server responses
 type tcpBodyRespValue struct {
 	Value []byte
@@ -34,6 +46,15 @@ type tcpBodyRespValue struct {
 
 type tcpBodyRespKeys struct {
 	Keys []string
+
+	// Extends:
+	tcpResponseImpl
+}
+
+type tcpBodyRespSyncKeys struct {
+	Vnode   *Vnode
+	Key     string
+	Version []uint
 
 	// Extends:
 	tcpResponseImpl

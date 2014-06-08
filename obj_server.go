@@ -29,6 +29,7 @@ type KVStoreIntf interface {
 	set(string, uint, []byte) error
 	list() ([]byte, error)
 	bulkSet(string, []KVStoreValue) error
+	syncKeys(string, []uint) (string, []uint, error)
 	purgeVersions(string, uint) error
 	incSync(string, uint, []byte) error
 	incSyncToSucc(*Vnode, string, uint, []byte, *sync.WaitGroup, chan bool, *error)
@@ -177,54 +178,4 @@ func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
 	}
 
 	return nil
-}
-
-func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
-	var wg sync.WaitGroup
-	var tokens chan bool
-	var errs []error
-
-	tokens = make(chan bool, MaxReplicationParallelism)
-	errs = make([]error, len(kvs.vn.successors))
-
-	for i := 0; i < MaxReplicationParallelism; i++ {
-		tokens <- true
-	}
-
-	// If we are the owner of the key, replicate the KV to the
-	// successors
-	if (kvs.vn.predecessor == nil) || ((kvs.vn.predecessor != nil) && (betweenRightIncl(kvs.vn.predecessor.Id, kvs.vn.Id, []byte(key)))) {
-
-		for idx, succVn := range kvs.vn.successors {
-			if succVn != nil {
-				wg.Add(1)
-
-				go kvs.incSyncToSucc(succVn, key, version, value, &wg, tokens, &errs[idx])
-			}
-		}
-
-		wg.Wait()
-
-		for idx := range kvs.vn.successors {
-			if errs[idx] != nil {
-				return errs[idx]
-			}
-		}
-	}
-
-	return nil
-}
-
-func (kvs *KVStore) incSyncToSucc(succVn *Vnode, key string, version uint, value []byte, wg *sync.WaitGroup, tokens chan bool, retErr *error) {
-	defer wg.Done()
-
-	<-tokens
-
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(succVn)
-
-	if !ok {
-		kvs.vn.ring.transport.(*LocalTransport).remote.Set(succVn, key, version, value)
-	}
-
-	tokens <- true
 }
