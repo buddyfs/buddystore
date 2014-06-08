@@ -105,16 +105,42 @@ func (kvs *KVStore) list() ([]string, error) {
 }
 
 func (kvs *KVStore) bulkSet(key string, valLst []KVStoreValue) error {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
+
 	if len(valLst) == 0 {
-		return nil
+		return fmt.Errorf("Empty list of values")
 	}
 
-	for _, val := range valLst {
-		err := kvs.set(key, val.Ver, val.Val)
+	kvLst, found := kvs.kv[key]
 
-		if err != nil {
-			fmt.Errorf("Bulk Set failed")
-			return err
+	for _, val := range valLst {
+		kvVal := &KVStoreValue{Ver: val.Ver, Val: val.Val}
+
+		if !found {
+			// This is the first value being added to the list.
+			kvLst = list.New()
+			kvs.kv[key] = kvLst
+
+			kvLst.PushFront(kvVal)
+
+			found = true
+		} else {
+			curMaxVerVal := kvLst.Front()
+
+			// Add a value only if the version is greater than the
+			// current max version
+			if curMaxVerVal != nil {
+				maxVer := curMaxVerVal.Value.(*KVStoreValue).Ver
+
+				if maxVer >= val.Ver {
+					kvLst.PushBack(kvVal)
+				} else {
+					kvLst.PushFront(kvVal)
+				}
+			} else {
+				kvLst.PushFront(kvVal)
+			}
 		}
 	}
 
