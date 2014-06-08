@@ -141,45 +141,6 @@ type tcpBodyBoolError struct {
 	tcpResponseImpl
 }
 
-/* TCP body for KV store requests */
-type tcpBodyGet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-}
-
-type tcpBodySet struct {
-	Vnode   *Vnode
-	Key     string
-	Version uint
-	Value   []byte
-}
-
-type tcpBodyList struct {
-	Vnode *Vnode
-}
-
-type tcpBodyBulkSet struct {
-	Vnode    *Vnode
-	Key      string
-	ValueLst []KVStoreValue
-}
-
-/* TCP body for KV store responses */
-type tcpBodyRespValue struct {
-	Value []byte
-
-	// Extends:
-	tcpResponseImpl
-}
-
-type tcpBodyRespKeys struct {
-	Keys []string
-
-	// Extends:
-	tcpResponseImpl
-}
-
 // Creates a new TCP transport on the given listen address with the
 // configured timeout duration.
 func InitTCPTransport(listen string, timeout time.Duration) (*TCPTransport, error) {
