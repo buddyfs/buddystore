@@ -50,10 +50,14 @@ func (pq *TimeoutQueue) Pop() interface{} {
 	return item
 }
 
-func (pq *TimeoutQueue) Peek() interface{} {
+func (pq *TimeoutQueue) Peek() *TimeoutItem {
 	n := len(*pq)
-	item := (*pq)[n-1]
-	return item
+	if n > 0 {
+		item := (*pq)[n-1]
+		return item
+	}
+
+	return nil
 }
 
 func (pq *TimeoutQueue) Get(i int) *TimeoutItem {
@@ -92,9 +96,15 @@ func NewTracker() Tracker {
 func (tr *TrackerImpl) handleTimer() {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
+	defer tr.rescheduleTimer()
 
 	head := tr.timeoutQueue.Peek()
-	nextTimer := head.(*TimeoutItem).priority
+
+	if head == nil {
+		return
+	}
+
+	nextTimer := head.priority
 	now := time.Now()
 
 	if now.After(nextTimer) {
@@ -121,7 +131,11 @@ func (tr *TrackerImpl) rescheduleTimer() {
 	}
 
 	head := tr.timeoutQueue.Peek()
-	nextTimer := head.(*TimeoutItem).priority
+	if head == nil {
+		return
+	}
+
+	nextTimer := head.priority
 
 	timeToNextTimer := nextTimer.Sub(time.Now())
 	tr.timer = time.AfterFunc(timeToNextTimer, func() {

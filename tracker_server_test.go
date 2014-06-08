@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -55,7 +56,6 @@ func TestTrackerHandleReJoin(t *testing.T) {
 	assert.Equal(t, existing[0], vnode1)
 }
 
-/*
 func TestTrackerJoinTimeout(t *testing.T) {
 	ringId := "ring1"
 	tr := NewTracker()
@@ -68,10 +68,9 @@ func TestTrackerJoinTimeout(t *testing.T) {
 
 	// TODO: Ideally, we'll be using some kind of a fake clock to do this.
 	// Time pressure :\
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	existing, err = tr.handleJoinRing(ringId, vnode2)
 	assert.NoError(t, err)
 	assert.Empty(t, existing)
 }
-*/
