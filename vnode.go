@@ -23,6 +23,7 @@ func (vn *localVnode) init(idx int) {
 
 	// Initialize all state
 	vn.successors = make([]*Vnode, vn.ring.config.NumSuccessors)
+	vn.predecessors = make([]*Vnode, vn.ring.config.NumSuccessors)
 	vn.finger = make([]*Vnode, vn.ring.config.hashBits)
 
 	// Register with the RPC mechanism
@@ -85,6 +86,11 @@ func (vn *localVnode) stabilize() {
 
 	// Check the predecessor
 	if err := vn.checkPredecessor(); err != nil {
+		log.Printf("[ERR] Error checking predecessor: %s", err)
+	}
+
+	// Update the predecessor list
+	if err := vn.updatePredecessorList(); err != nil {
 		log.Printf("[ERR] Error checking predecessor: %s", err)
 	}
 
@@ -201,6 +207,8 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 		})
 
 		vn.predecessor = maybe_pred
+
+		vn.predecessors[0] = maybe_pred
 	}
 
 	// Return our successors list
@@ -262,8 +270,42 @@ func (vn *localVnode) checkPredecessor() error {
 		// Predecessor is dead
 		if !res {
 			vn.predecessor = nil
+
+			for idx := 0; idx < vn.ring.config.NumSuccessors; idx++ {
+				vn.predecessors[idx] = nil
+			}
 		}
 	}
+	return nil
+}
+
+// Update the predecessor list
+func (vn *localVnode) updatePredecessorList() error {
+	if vn.predecessor != nil {
+		pred_list, err := vn.ring.transport.GetPredecessorList(vn.predecessor)
+		if err != nil {
+			return err
+		}
+
+		// Trim the predecessors list if too long
+		max_pred := vn.ring.config.NumSuccessors
+		if len(pred_list) > max_pred-1 {
+			pred_list = pred_list[:max_pred-1]
+		}
+
+		// Update local predecessors list
+		for idx, p := range pred_list {
+			if p == nil {
+				break
+			}
+			// Ensure we don't set ourselves as a predecessor!
+			if p == nil || p.String() == vn.String() {
+				break
+			}
+			vn.predecessors[idx+1] = p
+		}
+	}
+
 	return nil
 }
 
@@ -349,7 +391,12 @@ func (vn *localVnode) ClearPredecessor(p *Vnode) error {
 			conf.Delegate.PredecessorLeaving(&vn.Vnode, old)
 		})
 		vn.predecessor = nil
+
+		for idx := 0; idx < vn.ring.config.NumSuccessors; idx++ {
+			vn.predecessors[idx] = nil
+		}
 	}
+
 	return nil
 }
 
