@@ -30,4 +30,9 @@ func (m *MockLM) WLock(key string, version uint, timeout uint) (uint, error) {
 	return uint(args.Int(0)), args.Error(1)
 }
 
+func (m *MockLM) InvalidateRLock(lockID string) error {
+	args := m.Mock.Called(lockID)
+	return args.Error(1)
+}
+
 var _ LMClientIntf = new(MockLM)

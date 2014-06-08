@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"fmt"
+	"sync"
 )
 
 var NUM_LM_REPLICAS = 2
@@ -18,9 +19,12 @@ type WLockVal struct {
 }
 
 type LManagerClient struct {
+	Vnode  *Vnode               //  Vnode associated with this LMClient
 	Ring   *Ring                // Ring with whom the client is associated with
 	RLocks map[string]*RLockVal //  Map of <keys, ReadLock Values>
 	WLocks map[string]*WLockVal //  Map of <keys, WriteLock Values>
+
+	rLockMut sync.Mutex // Mutex lock for synchronizing access to RLocks map
 
 	// Implements:
 	LMClientIntf
@@ -33,6 +37,7 @@ type LMClientIntf interface {
 	WLock(key string, version uint, timeout uint) (uint, error)
 	CommitWLock(key string, version uint) error
 	AbortWLock(key string, version uint) error
+	InvalidateRLock(lockID string) error
 }
 
 func (lm *LManagerClient) getLManagerReplicas() ([]*Vnode, error) {
@@ -64,11 +69,13 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 		return 0, err
 	}
 	/* TODO : Discuss : Extract nodeID and send it to server side. Where to get that info*/
-	retLockID, ver, err := lm.Ring.transport.RLock(LMVnodes[0], key, "testNodeId")
+	retLockID, ver, err := lm.Ring.transport.RLock(LMVnodes[0], key, "testNodeID")
 	if err != nil {
 		return 0, fmt.Errorf("Cannot get ReadLock due to ", err)
 	}
+	lm.rLockMut.Lock()
 	lm.RLocks[key] = &RLockVal{lockID: retLockID, version: ver}
+	lm.rLockMut.Unlock()
 	return ver, nil
 }
 
@@ -123,5 +130,16 @@ func (lm *LManagerClient) AbortWLock(key string, version uint) error {
 	}
 	delete(lm.WLocks, key)
 
+	return nil
+}
+
+func (lm *LManagerClient) InvalidateRLock(lockID string) error {
+	_, ok := lm.RLocks[lockID]
+	if !ok {
+		return fmt.Errorf("Cannot find LockId on Client's RLock cache")
+	}
+	lm.rLockMut.Lock()
+	delete(lm.RLocks, lockID)
+	lm.rLockMut.Unlock()
 	return nil
 }

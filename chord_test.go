@@ -114,6 +114,10 @@ func (ml *MultiLocalTrans) AbortWLock(v *Vnode, key string, version uint, nodeID
 	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
+func (ml *MultiLocalTrans) InvalidateRLock(v *Vnode, lockID string) error {
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
 func (ml *MultiLocalTrans) Get(target *Vnode, key string, version uint) ([]byte, error) {
 	return nil, nil
 }

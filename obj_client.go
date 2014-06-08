@@ -2,7 +2,6 @@ package buddystore
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/golang/glog"
 )
@@ -66,6 +65,7 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("No Successors found")
 	}
 
+	// TODO: Choose a random successor instead of the first one.
 	value, err := kv.ring.Transport().Get(succVnodes[0], key, v)
 
 	// TODO: Should we retry this call if there is an error?
@@ -99,55 +99,28 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 		return err
 	}
 
+	if len(succVnodes) == 0 {
+		glog.Errorf("No successors found during Lookup in Get(%q)", key)
+		return fmt.Errorf("No Successors found")
+	}
+
 	if glog.V(2) {
 		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
-	var maxParallelism int = 4
-	var errs []error = make([]error, len(succVnodes))
-	var tokens chan bool = make(chan bool, maxParallelism)
-	var wg sync.WaitGroup
+	// This request should always go to the master node.
+	// Replication happens at the master.
+	err = kv.ring.Transport().Set(succVnodes[0], key, v, value)
 
-	for i := 0; i < maxParallelism; i++ {
-		tokens <- true
-	}
+	if err != nil {
+		glog.Errorf("Aborting Set(%q, %d) due to error: %q", key, v, err)
 
-	writeToReplica := func(node *Vnode, err *error, wg *sync.WaitGroup, tokens chan bool) {
-		// Take a token
-		<-tokens
+		// Best-effort Abort
+		kv.lm.AbortWLock(key, v)
 
-		// Perform the operation
-		*err = kv.ring.Transport().Set(node, key, v, value)
-
-		// Return the token
-		tokens <- true
-
-		// Signal completion
-		wg.Done()
-	}
-
-	for i := range succVnodes {
-		wg.Add(1)
-		go writeToReplica(succVnodes[i], &errs[i], &wg, tokens)
-	}
-
-	wg.Wait()
-
-	// Potential optimizations:
-	// - Fail fast => in case one of the replicas failed to write,
-	//                abort other threads and abort commit.
-
-	for i := range succVnodes {
-		if errs[i] != nil {
-			glog.Errorf("Aborting Set(%q, %d) due to error: %q", key, v, errs[i])
-
-			// Best-effort Abort
-			kv.lm.AbortWLock(key, v)
-
-			// Even if the Abort command failed, we can safely return
-			// because the lock manager will timeout and abort for us.
-			return errs[i]
-		}
+		// Even if the Abort command failed, we can safely return
+		// because the lock manager will timeout and abort for us.
+		return err
 	}
 
 	err = kv.lm.CommitWLock(key, v)
