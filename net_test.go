@@ -19,7 +19,7 @@ func prepRing(port int) (*Config, *TCPTransport, error) {
 	return conf, trans, nil
 }
 
-func TestTCPJoin(t *testing.T) {
+func TCPJoin(t *testing.T) {
 	// Prepare to create 2 nodes
 	c1, t1, err := prepRing(10025)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestTCPJoin(t *testing.T) {
 	t2.Shutdown()
 }
 
-func TestTCPLeave(t *testing.T) {
+func TCPLeave(t *testing.T) {
 	// Prepare to create 2 nodes
 	c1, t1, err := prepRing(10027)
 	if err != nil {
