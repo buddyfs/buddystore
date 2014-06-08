@@ -94,6 +94,21 @@ func (r *Ring) setLocalSuccessors() {
 	}
 }
 
+// Initializes the vnodes with their local predecessors
+func (r *Ring) setLocalPredecessors() {
+	numV := len(r.vnodes)
+	numPred := min(r.config.NumSuccessors, numV-1)
+	for idx, vnode := range r.vnodes {
+		for i := 0; i < numPred; i++ {
+			if (idx - i - 1) < 0 {
+				vnode.predecessors[i] = &r.vnodes[numV-i-1].Vnode
+			} else {
+				vnode.predecessors[i] = &r.vnodes[idx-i-1].Vnode
+			}
+		}
+	}
+}
+
 // Invokes a function on the delegate and returns completion channel
 func (r *Ring) invokeDelegate(f func()) chan struct{} {
 	if r.config.Delegate == nil {

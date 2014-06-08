@@ -191,6 +191,7 @@ func Create(conf *Config, trans Transport) (*Ring, error) {
 	ring := &Ring{}
 	ring.init(conf, trans)
 	ring.setLocalSuccessors()
+	ring.setLocalPredecessors()
 	ring.schedule()
 	return ring, nil
 }

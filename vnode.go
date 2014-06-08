@@ -91,7 +91,7 @@ func (vn *localVnode) stabilize() {
 
 	// Update the predecessor list
 	if err := vn.updatePredecessorList(); err != nil {
-		log.Printf("[ERR] Error checking predecessor: %s", err)
+		log.Printf("[ERR] Error updating predecessor list: %s", err)
 	}
 
 	// Set the last stabilized time
@@ -158,7 +158,18 @@ func (vn *localVnode) GetPredecessor() (*Vnode, error) {
 
 // RPC: Invoked to return out predecessor list
 func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
-	return vn.predecessors, nil
+
+	var retPredList []*Vnode
+
+	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors)
+
+	for i := 0; i < vn.ring.config.NumSuccessors; i++ {
+		if vn.predecessors[i] != nil {
+			retPredList = append(retPredList, vn.predecessors[i])
+		}
+	}
+
+	return retPredList, nil
 }
 
 // Notifies our successor of us, updates successor list
@@ -270,10 +281,7 @@ func (vn *localVnode) checkPredecessor() error {
 		// Predecessor is dead
 		if !res {
 			vn.predecessor = nil
-
-			for idx := 0; idx < vn.ring.config.NumSuccessors; idx++ {
-				vn.predecessors[idx] = nil
-			}
+			vn.predecessors[0] = nil
 		}
 	}
 	return nil
@@ -392,9 +400,7 @@ func (vn *localVnode) ClearPredecessor(p *Vnode) error {
 		})
 		vn.predecessor = nil
 
-		for idx := 0; idx < vn.ring.config.NumSuccessors; idx++ {
-			vn.predecessors[idx] = nil
-		}
+		vn.predecessors[0] = nil
 	}
 
 	return nil
