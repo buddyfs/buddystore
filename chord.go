@@ -58,6 +58,10 @@ type Transport interface {
 	Set(target *Vnode, key string, version uint, value []byte) error
 	List(target *Vnode) ([]string, error)
 	BulkSet(target *Vnode, key string, valLst []KVStoreValue) error
+
+	// Tracker operations
+	JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error)
+	LeaveRing(target *Vnode, ringId string) error
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -131,6 +135,8 @@ type RingIntf interface {
 	Lookup(n int, key []byte) ([]*Vnode, error)
 	Transport() Transport
 	GetNumSuccessors() int
+	GetLocalVnode() *Vnode
+	GetRingId() string
 }
 
 // Stores the state required for a Chord ring
@@ -275,4 +281,8 @@ func (r *Ring) Transport() Transport {
 
 func (r *Ring) GetNumSuccessors() int {
 	return r.config.NumSuccessors
+}
+
+func (r *Ring) GetRingId() string {
+	return r.config.RingId
 }

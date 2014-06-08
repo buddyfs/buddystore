@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"net"
+	"strconv"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 // Generates a random stabilization time
@@ -117,4 +121,23 @@ func printLogs(opsLog []*OpsLogEntry) {
 		fmt.Println(opsLog[i].OpNum, " | ", opsLog[i].Op, " | ", opsLog[i].Key, " - ", opsLog[i].Version, " | ", opsLog[i].Timeout)
 	}
 	fmt.Println()
+}
+
+func CreateNewTCPTransport() (Transport, *Config) {
+	port := int(rand.Uint32()%(64512) + 1024)
+	glog.Infof("PORT: %d", port)
+
+	listen := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
+	glog.Infof("Listen Address: %s", listen)
+
+	transport, err := InitTCPTransport(listen, LISTEN_TIMEOUT)
+	if err != nil {
+		// TODO: What if transport fails?
+		// Most likely cause: listen port conflict
+		panic("TODO: Is another process listening on this port?")
+	}
+
+	conf := DefaultConfig(listen)
+
+	return transport, conf
 }

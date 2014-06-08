@@ -119,15 +119,23 @@ func (ml *MultiLocalTrans) InvalidateRLock(v *Vnode, lockID string) error {
 }
 
 func (ml *MultiLocalTrans) Get(target *Vnode, key string, version uint) ([]byte, error) {
-	return nil, nil
+	return nil, fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) Set(target *Vnode, key string, version uint, value []byte) error {
-	return nil
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) List(target *Vnode) ([]string, error) {
-	return nil, nil
+	return nil, fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error) {
+	return nil, fmt.Errorf("MultiLocalTransport not implemented yet")
+}
+
+func (ml *MultiLocalTrans) LeaveRing(target *Vnode, ringId string) error {
+	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) BulkSet(target *Vnode, key string, valLst []KVStoreValue) error {

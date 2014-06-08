@@ -81,4 +81,12 @@ func (mt *MockTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValu
 	panic("Mock method not implemented")
 }
 
+func (mt *MockTransport) JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error) {
+	panic("Mock method not implemented")
+}
+
+func (mt *MockTransport) LeaveRing(target *Vnode, ringId string) error {
+	panic("Mock method not implemented")
+}
+
 var _ Transport = new(MockTransport)

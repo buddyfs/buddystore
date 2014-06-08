@@ -15,8 +15,16 @@ var timeout time.Duration = time.Duration(100 * time.Millisecond)
 func TestWriteLock(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT)
 	trans, err := InitTCPTransport(listen, timeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 
 	version, err := lm.WLock(TEST_KEY, 1, 10)

@@ -37,4 +37,12 @@ func (m MockRing) Transport() Transport {
 	return m.transport
 }
 
+func (m MockRing) GetLocalVnode() *Vnode {
+	panic("TODO: MockRing.GetLocalVnode")
+}
+
+func (m MockRing) GetRingId() string {
+	panic("TODO: MockRing.GetRingId")
+}
+
 var _ RingIntf = new(MockRing)
