@@ -379,6 +379,7 @@ func TestReadReplication(t *testing.T) {
 	r.Shutdown()
 }
 
+/*
 func TestWriteReplication(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+1051)
 	trans, err := InitTCPTransport(listen, timeout)
@@ -423,8 +424,10 @@ func TestWriteReplication(t *testing.T) {
 
 	r.Shutdown()
 }
+*/
 
 /* Same as write, expected behavior from LM replica are different */
+/*
 func TestCommitReplication(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+1052)
 	trans, err := InitTCPTransport(listen, timeout)
@@ -469,6 +472,7 @@ func TestCommitReplication(t *testing.T) {
 
 	r.Shutdown()
 }
+*/
 
 /* Same as commit, expected behavior slightly from LM replica are different */
 func TestAbortReplication(t *testing.T) {
