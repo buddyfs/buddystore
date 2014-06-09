@@ -1,16 +1,27 @@
 package buddystore
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"log"
+	"net"
 	"sync"
 
+	"github.com/anupcshan/Taipei-Torrent/torrent"
 	"github.com/golang/glog"
+	"github.com/nictuku/nettools"
 )
 
 const LISTEN_TIMEOUT = 1000
 
 const ENOTINITIALIZED = -1
 const OK = 0
+
+const TRACKER_URL = "udp://tracker.openbittorrent.com:80/announce"
+const BUDDYSTORE_INFOHASH_BASE = "BuddyStore"
+const PEERLEN = 6
 
 type BuddyStore struct {
 	Config       *BuddyStoreConfig
@@ -48,16 +59,67 @@ func (bs *BuddyStore) init() error {
 		return fmt.Errorf("Attempting to initialize an already initialized store")
 	}
 
-	transport, conf := CreateNewTCPTransport()
+	port, transport, conf := CreateNewTCPTransport()
 
 	var err error
 
-	// ring, err := Join(conf, transport, <host name from tracker>)
-	bs.GlobalRing, err = Create(conf, transport)
+	h := sha1.New()
+	io.WriteString(h, BUDDYSTORE_INFOHASH_BASE)
+	infohash := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
+
+	var peeridBase = bs.Config.MyID
+	h = sha1.New()
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				continue
+			}
+			peeridBase = iface.HardwareAddr.String()
+			break
+		}
+	}
+	glog.Infof("Peerid base: %s", peeridBase)
+	io.WriteString(h, peeridBase)
+	peerid := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
+
+	glog.Infof("Announcing to tracker %s about infohash '%s' using peerid '%s' on port %d", TRACKER_URL, infohash, peerid, port)
+	tResp, err := torrent.QueryTracker(nil, torrent.ClientStatusReport{InfoHash: infohash, PeerId: peerid, Port: uint16(port), Downloaded: 100, Left: 10, Uploaded: 200}, TRACKER_URL)
 
 	if err != nil {
-		// Simply retry the init process
+		glog.Errorf("Error querying tracker: %s", err)
 		return err
+	}
+
+	glog.Infof("Tracker Response Peers: %d, %d, %q", tResp.Complete, tResp.Incomplete, tResp.Peers)
+
+	peers := tResp.Peers
+
+	if len(peers) > 0 {
+		log.Println("Tracker gave us", len(peers)/PEERLEN, "peers")
+		for i := 0; i < len(peers); i += PEERLEN {
+			peer := nettools.BinaryToDottedPort(peers[i : i+PEERLEN])
+			glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
+			bs.GlobalRing, err = Join(conf, transport, peer)
+
+			if err == nil {
+				glog.Infof("Successfully joined chord ring using peer %s", peer)
+				break
+			} else {
+				glog.Infof("Failed to contact peer with error: %s", err)
+			}
+
+			bs.GlobalRing = nil
+		}
+	}
+
+	if bs.GlobalRing == nil {
+		bs.GlobalRing, err = Create(conf, transport)
+
+		if err != nil {
+			// Simply retry the init process
+			return err
+		}
 	}
 
 	bs.Tracker = NewTrackerClient(bs.GlobalRing)

@@ -1,7 +1,6 @@
 package buddystore
 
 import (
-	"container/list"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -23,13 +22,16 @@ func (vn *localVnode) init(idx int) {
 
 	// Initialize all state
 	vn.successors = make([]*Vnode, vn.ring.config.NumSuccessors)
+	vn.predecessors = make([]*Vnode, vn.ring.config.NumSuccessors+1)
 	vn.finger = make([]*Vnode, vn.ring.config.hashBits)
 
 	// Register with the RPC mechanism
 	vn.ring.transport.Register(&vn.Vnode, vn)
 
 	// Initialise the key-value store
-	vn.store = &KVStore{vn: vn, kv: make(map[string]*list.List)}
+	vn.store = &KVStore{}
+	vn.store.vn = vn
+	vn.store.init()
 
 	// Initialize the tracker server
 	// TODO: Should we check this ring supports a tracker server?
@@ -88,6 +90,16 @@ func (vn *localVnode) stabilize() {
 		log.Printf("[ERR] Error checking predecessor: %s", err)
 	}
 
+	// Update the predecessor list
+	if err := vn.updatePredecessorList(); err != nil {
+		log.Printf("[ERR] Error updating predecessor list: %s", err)
+	}
+
+	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
+
+	go vn.store.localRepl()
+	go vn.store.globalRepl()
+
 	// Set the last stabilized time
 	vn.stabilized = time.Now()
 }
@@ -145,6 +157,22 @@ func (vn *localVnode) GetPredecessor() (*Vnode, error) {
 	return vn.predecessor, nil
 }
 
+// RPC: Invoked to return out predecessor list
+func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
+
+	var retPredList []*Vnode
+
+	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors+1)
+
+	for i := 0; i < vn.ring.config.NumSuccessors+1; i++ {
+		if vn.predecessors[i] != nil {
+			retPredList = append(retPredList, vn.predecessors[i])
+		}
+	}
+
+	return retPredList, nil
+}
+
 // Notifies our successor of us, updates successor list
 func (vn *localVnode) notifySuccessor() error {
 	// Notify successor
@@ -186,6 +214,8 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 		})
 
 		vn.predecessor = maybe_pred
+
+		vn.predecessors[0] = maybe_pred
 	}
 
 	// Return our successors list
@@ -247,8 +277,39 @@ func (vn *localVnode) checkPredecessor() error {
 		// Predecessor is dead
 		if !res {
 			vn.predecessor = nil
+			vn.predecessors[0] = nil
 		}
 	}
+	return nil
+}
+
+// Update the predecessor list
+func (vn *localVnode) updatePredecessorList() error {
+	if vn.predecessor != nil {
+		pred_list, err := vn.ring.transport.GetPredecessorList(vn.predecessor)
+		if err != nil {
+			return err
+		}
+
+		// Trim the predecessors list if too long
+		max_pred := vn.ring.config.NumSuccessors + 1
+		if len(pred_list) > max_pred-1 {
+			pred_list = pred_list[:max_pred-1]
+		}
+
+		// Update local predecessors list
+		for idx, p := range pred_list {
+			if p == nil {
+				break
+			}
+			// Ensure we don't set ourselves as a predecessor!
+			if p == nil || p.String() == vn.String() {
+				break
+			}
+			vn.predecessors[idx+1] = p
+		}
+	}
+
 	return nil
 }
 
@@ -328,7 +389,10 @@ func (vn *localVnode) ClearPredecessor(p *Vnode) error {
 			conf.Delegate.PredecessorLeaving(&vn.Vnode, old)
 		})
 		vn.predecessor = nil
+
+		vn.predecessors[0] = nil
 	}
+
 	return nil
 }
 

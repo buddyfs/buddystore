@@ -50,6 +50,7 @@ const (
 	tcpPing = iota
 	tcpListReq
 	tcpGetPredReq
+	tcpGetPredListReq
 	tcpNotifyReq
 	tcpFindSucReq
 	tcpClearPredReq
@@ -354,6 +355,18 @@ func (t *TCPTransport) Notify(target, self *Vnode) ([]*Vnode, error) {
 func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, error) {
 	resp := tcpBodyVnodeListError{}
 	err := t.networkCall(vn.Host, tcpFindSucReq, tcpBodyFindSuc{Target: vn, Num: n, Key: k}, &resp)
+
+	if err != nil {
+		return nil, err
+	} else {
+		return resp.Vnodes, nil
+	}
+}
+
+// Request a nodes predecessor list
+func (t *TCPTransport) GetPredecessorList(vn *Vnode) ([]*Vnode, error) {
+	resp := tcpBodyVnodeListError{}
+	err := t.networkCall(vn.Host, tcpGetPredListReq, tcpBodyVnode{Vn: vn}, &resp)
 
 	if err != nil {
 		return nil, err
@@ -841,6 +854,26 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Target.Host, body.Target.String())
+			}
+
+		case tcpGetPredListReq:
+			body := tcpBodyVnode{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Vn)
+			resp := tcpBodyVnodeListError{}
+			sendResp = &resp
+			if ok {
+				nodes, err := obj.GetPredecessorList()
+				resp.Vnodes = nodes
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String())
 			}
 
 		case tcpGet:

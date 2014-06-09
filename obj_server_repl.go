@@ -1,18 +1,185 @@
 package buddystore
 
 import (
+	"fmt"
 	"sync"
 )
+
+const (
+	MaxIncSyncParallelism = 8
+	MaxReplParallelism    = 12
+)
+
+func (kvs *KVStore) localRepl() {
+	var first_pred *Vnode
+	var second_pred *Vnode
+	var last_pred *Vnode
+	var first_succ *Vnode
+	var num_pred int
+
+	kvs.kvLock.Lock()
+
+	for i := 0; i < len(kvs.pred_list); i++ {
+		if kvs.pred_list[i] != nil {
+			num_pred++
+		}
+	}
+
+	if num_pred > kvs.vn.ring.config.NumSuccessors {
+		num_pred = kvs.vn.ring.config.NumSuccessors
+	}
+
+	first_pred = kvs.pred_list[0]
+
+	if first_pred == nil {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	second_pred = kvs.pred_list[1]
+
+	if second_pred == nil {
+		second_pred = kvs.pred_list[0]
+	}
+
+	for i := num_pred - 1; i >= 0; i-- {
+		if kvs.pred_list[i] != nil {
+			last_pred = kvs.pred_list[i]
+			break
+		}
+	}
+
+	first_succ = kvs.succ_list[0]
+
+	if (first_pred == nil) || (second_pred == nil) || (last_pred == nil) {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	kvs.kvLock.Unlock()
+
+	var wg sync.WaitGroup
+	var tokens chan bool
+
+	tokens = make(chan bool, MaxReplParallelism)
+
+	for i := 0; i < MaxReplParallelism; i++ {
+		tokens <- true
+	}
+
+	for key := range kvs.kv {
+		if first_succ != nil {
+			if betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key)) {
+				wg.Add(1)
+				go kvs.sendSyncKeys(first_succ, key, &wg, tokens)
+			}
+		}
+
+		if betweenRightIncl(second_pred.Id, first_pred.Id, []byte(key)) {
+			wg.Add(1)
+			go kvs.sendSyncKeys(first_pred, key, &wg, tokens)
+		}
+	}
+
+	wg.Wait()
+
+	return
+}
+
+func (kvs *KVStore) globalRepl() {
+	var last_pred *Vnode
+	var num_pred int
+
+	kvs.kvLock.Lock()
+
+	for i := 0; i < len(kvs.pred_list); i++ {
+		if kvs.pred_list[i] != nil {
+			num_pred++
+		}
+	}
+
+	if num_pred <= kvs.vn.ring.config.NumSuccessors {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	last_pred = kvs.pred_list[num_pred-1]
+
+	if last_pred == nil {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	kvs.kvLock.Unlock()
+
+	var wg sync.WaitGroup
+	var tokens chan bool
+
+	tokens = make(chan bool, MaxReplParallelism)
+
+	for i := 0; i < MaxReplParallelism; i++ {
+		tokens <- true
+	}
+
+	for key := range kvs.kv {
+		if !(betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key))) {
+
+			succ_list, err := kvs.vn.ring.Lookup(1, []byte(key))
+
+			if err == nil {
+				if succ_list[0] != nil {
+
+					wg.Add(1)
+					go kvs.sendSyncKeys(succ_list[0], key, &wg, tokens)
+				}
+			} else {
+				fmt.Errorf("Global Repl: Look up failed")
+			}
+		}
+	}
+
+	wg.Wait()
+
+	return
+}
+
+func (kvs *KVStore) sendSyncKeys(target *Vnode, key string, wg *sync.WaitGroup, tokens chan bool) {
+	defer wg.Done()
+
+	<-tokens
+
+	kvLst, found := kvs.kv[key]
+
+	if !found {
+		tokens <- true
+		return
+	}
+
+	ver := make([]uint, 0, kvLst.Len())
+
+	for i := kvLst.Front(); i != nil; i = i.Next() {
+		ver = append(ver, i.Value.(*KVStoreValue).Ver)
+	}
+
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(target)
+
+	if !ok {
+		kvs.vn.ring.transport.(*LocalTransport).remote.SyncKeys(target, &kvs.vn.Vnode, key, ver)
+	}
+
+	tokens <- true
+	return
+}
 
 func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 	var wg sync.WaitGroup
 	var tokens chan bool
 	var errs []error
 
-	tokens = make(chan bool, MaxReplicationParallelism)
+	tokens = make(chan bool, MaxIncSyncParallelism)
 	errs = make([]error, len(kvs.vn.successors))
 
-	for i := 0; i < MaxReplicationParallelism; i++ {
+	for i := 0; i < MaxIncSyncParallelism; i++ {
 		tokens <- true
 	}
 

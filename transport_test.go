@@ -8,6 +8,7 @@ import (
 type MockVnodeRPC struct {
 	err       error
 	pred      *Vnode
+	pred_list []*Vnode
 	not_pred  *Vnode
 	succ_list []*Vnode
 	key       []byte
@@ -17,6 +18,9 @@ type MockVnodeRPC struct {
 
 func (mv *MockVnodeRPC) GetPredecessor() (*Vnode, error) {
 	return mv.pred, mv.err
+}
+func (mv *MockVnodeRPC) GetPredecessorList() ([]*Vnode, error) {
+	return mv.pred_list, mv.err
 }
 func (mv *MockVnodeRPC) Notify(vn *Vnode) ([]*Vnode, error) {
 	mv.not_pred = vn
