@@ -128,7 +128,7 @@ func printLogs(opsLog []*OpsLogEntry) {
 
 func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 	upnpclient, _, err := internetgateway1.NewWANIPConnection1Clients()
-	if err != nil {
+	if err == nil {
 		externalAddr, err = upnpclient[0].GetExternalIPAddress()
 		glog.Infof("External IP: %s, err: %s", externalAddr, err)
 	}
