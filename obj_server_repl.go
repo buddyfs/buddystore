@@ -71,13 +71,13 @@ func (kvs *KVStore) localRepl() {
 		if first_succ != nil {
 			if betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key)) {
 				wg.Add(1)
-				go kvs.sendSyncKeys(first_succ, key)
+				go kvs.sendSyncKeys(first_succ, key, &wg, tokens)
 			}
 		}
 
 		if betweenRightIncl(second_pred.Id, first_pred.Id, []byte(key)) {
 			wg.Add(1)
-			go kvs.sendSyncKeys(first_pred, key)
+			go kvs.sendSyncKeys(first_pred, key, &wg, tokens)
 		}
 	}
 
@@ -130,7 +130,7 @@ func (kvs *KVStore) globalRepl() {
 				if succ_list[0] != nil {
 
 					wg.Add(1)
-					go kvs.sendSyncKeys(succ_list[0], key)
+					go kvs.sendSyncKeys(succ_list[0], key, &wg, tokens)
 				}
 			} else {
 				fmt.Errorf("Global Repl: Look up failed")
@@ -143,7 +143,31 @@ func (kvs *KVStore) globalRepl() {
 	return
 }
 
-func (kvs *KVStore) sendSyncKeys(target *Vnode, key string) {
+func (kvs *KVStore) sendSyncKeys(target *Vnode, key string, wg *sync.WaitGroup, tokens chan bool) {
+	defer wg.Done()
+
+	<-tokens
+
+	kvLst, found := kvs.kv[key]
+
+	if !found {
+		tokens <- true
+		return
+	}
+
+	ver := make([]uint, 0, kvLst.Len())
+
+	for i := kvLst.Front(); i != nil; i = i.Next() {
+		ver = append(ver, i.Value.(*KVStoreValue).Ver)
+	}
+
+	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(target)
+
+	if !ok {
+		kvs.vn.ring.transport.(*LocalTransport).remote.SyncKeys(target, &kvs.vn.Vnode, key, ver)
+	}
+
+	tokens <- true
 	return
 }
 
