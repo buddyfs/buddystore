@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/huin/goupnp/dcps/internetgateway1"
 )
+
+const LISTEN_TIMEOUT = 5 * time.Second
 
 // Generates a random stabilization time
 func randStabilize(conf *Config) time.Duration {
@@ -123,12 +126,37 @@ func printLogs(opsLog []*OpsLogEntry) {
 	fmt.Println()
 }
 
+func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
+	upnpclient, _, err := internetgateway1.NewWANIPConnection1Clients()
+	if err == nil {
+		externalAddr, err = upnpclient[0].GetExternalIPAddress()
+		glog.Infof("External IP: %s, err: %s", externalAddr, err)
+	}
+
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				continue
+			}
+			addrs, _ := iface.Addrs()
+			glog.Infof("Address: %s", addrs[0].(*net.IPNet).IP.String())
+			localAddr = addrs[0].(*net.IPNet).IP.String()
+			return
+		}
+	}
+
+	return
+}
+
 func CreateNewTCPTransport() (int, Transport, *Config) {
 	port := int(rand.Uint32()%(64512) + 1024)
 	glog.Infof("PORT: %d", port)
 
 	listen := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 	glog.Infof("Listen Address: %s", listen)
+
+	localAddr, externalAddr := GetLocalExternalAddresses()
 
 	transport, err := InitTCPTransport(listen, LISTEN_TIMEOUT)
 	if err != nil {
@@ -137,8 +165,20 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 		panic("TODO: Is another process listening on this port?")
 	}
 
+	upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
+	glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
+
+	if err == nil {
+		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), localAddr, true, "BuddyStore", 0)
+		glog.Infof("Added port mapping: %s", err)
+	}
+
 	conf := DefaultConfig(listen)
-	conf.Hostname = listen
+	if len(externalAddr) > 0 {
+		conf.Hostname = net.JoinHostPort(externalAddr, strconv.Itoa(port))
+	} else {
+		conf.Hostname = net.JoinHostPort(localAddr, strconv.Itoa(port))
+	}
 
 	return port, transport, conf
 }

@@ -194,7 +194,7 @@ func (kvs *KVStore) purgeVersions(key string, maxVersion uint) error {
 
 func (kvs *KVStore) updatePredSuccList(pred_list []*Vnode, succ_list []*Vnode) error {
 	kvs.kvLock.Lock()
-	kvs.kvLock.Unlock()
+	defer kvs.kvLock.Unlock()
 
 	copy(kvs.pred_list, pred_list)
 	copy(kvs.succ_list, succ_list)

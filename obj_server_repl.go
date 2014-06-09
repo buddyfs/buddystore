@@ -68,14 +68,20 @@ func (kvs *KVStore) localRepl() {
 	}
 
 	for key := range kvs.kv {
+
+		// Hash the key
+		h := kvs.vn.ring.config.HashFunc()
+		h.Write([]byte(key))
+		key_hash := h.Sum(nil)
+
 		if first_succ != nil {
-			if betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key)) {
+			if betweenRightIncl(last_pred.Id, kvs.vn.Id, key_hash) {
 				wg.Add(1)
 				go kvs.sendSyncKeys(first_succ, key, &wg, tokens)
 			}
 		}
 
-		if betweenRightIncl(second_pred.Id, first_pred.Id, []byte(key)) {
+		if betweenRightIncl(second_pred.Id, first_pred.Id, key_hash) {
 			wg.Add(1)
 			go kvs.sendSyncKeys(first_pred, key, &wg, tokens)
 		}
@@ -122,7 +128,12 @@ func (kvs *KVStore) globalRepl() {
 	}
 
 	for key := range kvs.kv {
-		if !(betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key))) {
+		// Hash the key
+		h := kvs.vn.ring.config.HashFunc()
+		h.Write([]byte(key))
+		key_hash := h.Sum(nil)
+
+		if !(betweenRightIncl(last_pred.Id, kvs.vn.Id, key_hash)) {
 
 			succ_list, err := kvs.vn.ring.Lookup(1, []byte(key))
 
@@ -183,9 +194,14 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 		tokens <- true
 	}
 
+	// Hash the key
+	h := kvs.vn.ring.config.HashFunc()
+	h.Write([]byte(key))
+	key_hash := h.Sum(nil)
+
 	// If we are the owner of the key, replicate the KV to the
 	// successors
-	if (kvs.vn.predecessor == nil) || ((kvs.vn.predecessor != nil) && (betweenRightIncl(kvs.vn.predecessor.Id, kvs.vn.Id, []byte(key)))) {
+	if (kvs.vn.predecessor == nil) || ((kvs.vn.predecessor != nil) && (betweenRightIncl(kvs.vn.predecessor.Id, kvs.vn.Id, key_hash))) {
 
 		for idx, succVn := range kvs.vn.successors {
 			if succVn != nil {

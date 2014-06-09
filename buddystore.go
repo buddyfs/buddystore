@@ -7,14 +7,13 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 
 	"github.com/anupcshan/Taipei-Torrent/torrent"
 	"github.com/golang/glog"
 	"github.com/nictuku/nettools"
 )
-
-const LISTEN_TIMEOUT = 1000
 
 const ENOTINITIALIZED = -1
 const OK = 0
@@ -99,6 +98,14 @@ func (bs *BuddyStore) init() error {
 		log.Println("Tracker gave us", len(peers)/PEERLEN, "peers")
 		for i := 0; i < len(peers); i += PEERLEN {
 			peer := nettools.BinaryToDottedPort(peers[i : i+PEERLEN])
+			_, prt, _ := net.SplitHostPort(peer)
+			if prt == strconv.Itoa(port) {
+				glog.Infoln("Skipping self as peer")
+				// TODO: Hack to make sure we don't connect to ourselves.
+				// To be more correct, we should check hostname as well.
+				continue
+			}
+
 			glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
 			bs.GlobalRing, err = Join(conf, transport, peer)
 
