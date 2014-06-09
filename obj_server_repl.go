@@ -6,13 +6,93 @@ import (
 
 const (
 	MaxIncSyncParallelism = 8
+	MaxReplParallelism    = 12
 )
 
 func (kvs *KVStore) localRepl() {
+	var first_pred *Vnode
+	var second_pred *Vnode
+	var last_pred *Vnode
+	var first_succ *Vnode
+	var num_pred int
+
+	kvs.kvLock.Lock()
+
+	for i := 0; i < len(kvs.pred_list); i++ {
+		if kvs.pred_list[i] != nil {
+			num_pred++
+		}
+	}
+
+	if num_pred > kvs.vn.ring.config.NumSuccessors {
+		num_pred = kvs.vn.ring.config.NumSuccessors
+	}
+
+	first_pred = kvs.pred_list[0]
+
+	if first_pred == nil {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	second_pred = kvs.pred_list[1]
+
+	if second_pred == nil {
+		second_pred = kvs.pred_list[0]
+	}
+
+	for i := num_pred - 1; i >= 0; i-- {
+		if kvs.pred_list[i] != nil {
+			last_pred = kvs.pred_list[i]
+			break
+		}
+	}
+
+	first_succ = kvs.succ_list[0]
+
+	if (first_pred == nil) || (second_pred == nil) || (last_pred == nil) {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	kvs.kvLock.Unlock()
+
+	var wg sync.WaitGroup
+	var tokens chan bool
+
+	tokens = make(chan bool, MaxReplParallelism)
+
+	for i := 0; i < MaxReplParallelism; i++ {
+		tokens <- true
+	}
+
+	for key := range kvs.kv {
+		if first_succ != nil {
+			if betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key)) {
+				wg.Add(1)
+				go kvs.sendSyncKeys(first_succ, key)
+			}
+		}
+
+		if betweenRightIncl(second_pred.Id, first_pred.Id, []byte(key)) {
+			wg.Add(1)
+			go kvs.sendSyncKeys(first_pred, key)
+		}
+	}
+
+	wg.Wait()
+
 	return
 }
 
 func (kvs *KVStore) globalRepl() {
+	kvs.kvLock.Lock()
+	defer kvs.kvLock.Unlock()
+
+	return
+}
+
+func (kvs *KVStore) sendSyncKeys(target *Vnode, key string) {
 	return
 }
 

@@ -22,7 +22,7 @@ func (vn *localVnode) init(idx int) {
 
 	// Initialize all state
 	vn.successors = make([]*Vnode, vn.ring.config.NumSuccessors)
-	vn.predecessors = make([]*Vnode, vn.ring.config.NumSuccessors)
+	vn.predecessors = make([]*Vnode, vn.ring.config.NumSuccessors+1)
 	vn.finger = make([]*Vnode, vn.ring.config.hashBits)
 
 	// Register with the RPC mechanism
@@ -167,9 +167,9 @@ func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
 
 	var retPredList []*Vnode
 
-	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors)
+	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors+1)
 
-	for i := 0; i < vn.ring.config.NumSuccessors; i++ {
+	for i := 0; i < vn.ring.config.NumSuccessors+1; i++ {
 		if vn.predecessors[i] != nil {
 			retPredList = append(retPredList, vn.predecessors[i])
 		}
@@ -302,7 +302,7 @@ func (vn *localVnode) updatePredecessorList() error {
 		}
 
 		// Trim the predecessors list if too long
-		max_pred := vn.ring.config.NumSuccessors
+		max_pred := vn.ring.config.NumSuccessors + 1
 		if len(pred_list) > max_pred-1 {
 			pred_list = pred_list[:max_pred-1]
 		}
