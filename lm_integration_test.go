@@ -357,3 +357,161 @@ func LMDetector(t *testing.T) {
 		r[i].Shutdown()
 	}
 }
+
+func TestReadReplication(t *testing.T) {
+	var listen string = fmt.Sprintf("localhost:%d", PORT+1050)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	// Sleep for 100 ms for LM to be selected
+	time.Sleep(110 * time.Millisecond)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+
+	readVersion, err := lm.RLock(TEST_KEY, true)
+	if err != nil {
+		t.Fatalf("Error while getting Read Lock ", err)
+	}
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+	r.Shutdown()
+}
+
+func TestWriteReplication(t *testing.T) {
+	var listen string = fmt.Sprintf("localhost:%d", PORT+1051)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	// Sleep for 100 ms for LM to be selected
+	time.Sleep(110 * time.Millisecond)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	if err != nil {
+		t.Fatalf("Unexpected Error : ", err)
+	}
+	if version != 1 {
+		t.Fatalf("Expected version : 1, but got ", version, " from the LMserver")
+	}
+	// Actual replication check
+	LMVnodes, err := lm.Ring.Lookup(1, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error in getting the LM node : But got ", err)
+	}
+	LMLocalVnode, _ := r.Transport().(*LocalTransport).get(LMVnodes[0]) // We will surely get a localVnode since all are local
+	succNodes, err := LMLocalVnode.FindSuccessors(2, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error while finding successors for the current LM, but got ", err)
+	}
+	if len(succNodes) != 2 {
+		t.Fatalf("Not enough replicas, need 2 but found ", len(succNodes))
+	}
+	for i := range succNodes {
+		localVnode, _ := r.Transport().(*LocalTransport).get(succNodes[i])
+		present, version, err := localVnode.CheckWLock(TEST_KEY)
+		if err != nil {
+			t.Fatalf("Not a replication error : Error occurred while trying to get localVnode : got ", err)
+		}
+		if !present {
+			t.Fatalf("Replication failed : Key not present in replica ", i)
+		}
+		if version != 1 {
+			t.Fatalf("Replication failed : Key present, but the version number is ", version, " instead of 1 in replica ", i)
+		}
+	}
+
+	r.Shutdown()
+}
+
+/* Same as write, expected behavior from LM replica are different */
+func TestCommitReplication(t *testing.T) {
+	var listen string = fmt.Sprintf("localhost:%d", PORT+1052)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	// Sleep for 100 ms for LM to be selected
+	time.Sleep(110 * time.Millisecond)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.CommitWLock(TEST_KEY, version)
+	// Actual replication check
+	LMVnodes, err := lm.Ring.Lookup(1, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error in getting the LM node : But got ", err)
+	}
+	LMLocalVnode, _ := r.Transport().(*LocalTransport).get(LMVnodes[0]) // We will surely get a localVnode since all are local
+	succNodes, err := LMLocalVnode.FindSuccessors(2, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error while finding successors for the current LM, but got ", err)
+	}
+	if len(succNodes) != 2 {
+		t.Fatalf("Not enough replicas, need 2 but found ", len(succNodes))
+	}
+	for i := range succNodes {
+		localVnode, _ := r.Transport().(*LocalTransport).get(succNodes[i])
+		present, _, err := localVnode.CheckWLock(TEST_KEY)
+		if err != nil {
+			t.Fatalf("Not a replication error : Error occurred while trying to get localVnode : got ", err)
+		}
+		if present {
+			t.Fatalf("Commit Replication failed : Key still present in WriteLocks in replica ", i)
+		}
+		id, _ := localVnode.GetId()
+		_, ver, err := localVnode.RLock(TEST_KEY, id, "") // Dummy values, don't need to bother about invalidation.
+		if err != nil {
+			t.Fatalf("Commit Replication failed : Got ", err, " : Unable to get RLock on a committed key ", TEST_KEY, " on replica ", i)
+		}
+		if ver != 1 {
+			t.Fatalf("Commit Replication failed : Expected version number is 1, but got ", ver, " on replica", i)
+		}
+	}
+
+	r.Shutdown()
+}
+
+/* Same as commit, expected behavior slightly from LM replica are different */
+func TestAbortReplication(t *testing.T) {
+	var listen string = fmt.Sprintf("localhost:%d", PORT+1053)
+	trans, err := InitTCPTransport(listen, timeout)
+	var conf *Config = fastConf()
+	r, err := Create(conf, trans)
+	// Sleep for 100 ms for LM to be selected
+	time.Sleep(110 * time.Millisecond)
+	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+	version, err := lm.WLock(TEST_KEY, 1, 10)
+	err = lm.AbortWLock(TEST_KEY, version)
+	// Actual replication check
+	LMVnodes, err := lm.Ring.Lookup(1, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error in getting the LM node : But got ", err)
+	}
+	LMLocalVnode, _ := r.Transport().(*LocalTransport).get(LMVnodes[0]) // We will surely get a localVnode since all are local
+	succNodes, err := LMLocalVnode.FindSuccessors(2, []byte(lm.Ring.GetRingId()))
+	if err != nil {
+		t.Fatalf("Expected no error while finding successors for the current LM, but got ", err)
+	}
+	if len(succNodes) != 2 {
+		t.Fatalf("Not enough replicas, need 2 but found ", len(succNodes))
+	}
+	for i := range succNodes {
+		localVnode, _ := r.Transport().(*LocalTransport).get(succNodes[i])
+		present, _, err := localVnode.CheckWLock(TEST_KEY)
+		if err != nil {
+			t.Fatalf("Not a replication error : Error occurred while trying to get localVnode : got ", err)
+		}
+		if present {
+			t.Fatalf("Abort Replication failed : Key still present in WriteLocks in replica ", i)
+		}
+		id, _ := localVnode.GetId()
+		_, ver, err := localVnode.RLock(TEST_KEY, id, "") // Dummy values, don't need to bother about invalidation.
+		if err == nil {
+			t.Fatalf("Abort Replication failed : Should get RLock not available error for the aborted key ", TEST_KEY, " on replica ", i)
+		}
+		if ver != 0 {
+			t.Fatalf("Abort Replication failed : Expected version number is 0, but got ", ver, " on replica", i)
+		}
+	}
+
+	r.Shutdown()
+}

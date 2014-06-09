@@ -83,6 +83,7 @@ type VnodeRPC interface {
 	ClearPredecessor(*Vnode) error
 	SkipSuccessor(*Vnode) error
 	GetPredecessorList() ([]*Vnode, error)
+	GetId() (string, error)
 
 	// KV Store operations
 	Get(key string, version uint) ([]byte, error)
@@ -99,6 +100,7 @@ type VnodeRPC interface {
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
 	InvalidateRLock(lockID string) error
+	CheckWLock(key string) (bool, uint, error)
 
 	// Tracker operations
 	JoinRing(ringId string, self *Vnode) ([]*Vnode, error)
@@ -351,4 +353,8 @@ func (r *Ring) GetLocalVnode() *Vnode {
 
 func (r *Ring) GetHashFunc() func() hash.Hash {
 	return r.config.HashFunc
+}
+
+func (r *Ring) GetConfig() *Config {
+	return r.config
 }

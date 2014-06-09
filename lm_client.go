@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-var NUM_LM_REPLICAS = 2
+var NUM_LM_REPLICA = 2
 
 type RLockVal struct {
 	lockID  string
@@ -43,7 +43,7 @@ type LMClientIntf interface {
 
 func (lm *LManagerClient) getLManagerReplicas() ([]*Vnode, error) {
 	/* TODO : Discuss : Right not supports only one LockManager. */
-	LMVnodes, err := lm.Ring.Lookup(NUM_LM_REPLICAS, []byte(lm.Ring.GetRingId()))
+	LMVnodes, err := lm.Ring.Lookup(NUM_LM_REPLICA, []byte(lm.Ring.GetRingId()))
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (lm *LManagerClient) CommitWLock(key string, version uint) error {
 		return err
 	}
 
-	err = lm.Ring.Transport().CommitWLock(LMVnodes[0], key, version, "testNodeId")
+	err = lm.Ring.Transport().CommitWLock(LMVnodes[0], key, version, lm.Ring.GetLocalVnode().String())
 	if err != nil {
 		return err
 	}

@@ -443,6 +443,14 @@ func (vn *localVnode) CommitWLock(key string, version uint, nodeID string) error
 	return err
 }
 
+func (vn *localVnode) CheckWLock(key string) (bool, uint, error) {
+	return vn.lm.checkWLock(key)
+}
+
+func (vn *localVnode) GetId() (string, error) {
+	return vn.String(), nil // Does it even have an error component? Having it for consistent interface methods
+}
+
 func (vn *localVnode) InvalidateRLock(lockID string) error {
 	lmClient := vn.lm_client
 	if lmClient == nil {

@@ -81,6 +81,14 @@ func (mv *MockVnodeRPC) CommitWLock(key string, version uint, nodeID string) err
 	return nil
 }
 
+func (mv *MockVnodeRPC) CheckWLock(key string) (bool, uint, error) {
+	return false, 0, nil
+}
+
+func (mv *MockVnodeRPC) GetId() (string, error) {
+	return "", nil
+}
+
 func (mv *MockVnodeRPC) InvalidateRLock(lockID string) error {
 	return nil
 }
