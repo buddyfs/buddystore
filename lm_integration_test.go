@@ -240,6 +240,7 @@ func TestJoinLockRemote(t *testing.T) {
 
 //  This is a end-to-end integration test. From Vnode to Vnode.
 func TestRLockInvalidate(t *testing.T) {
+	<-time.After(100 * time.Millisecond)
 	listen1 := fmt.Sprintf("localhost:%d", PORT+1000)
 	listen2 := fmt.Sprintf("localhost:%d", PORT+1001)
 
@@ -297,9 +298,9 @@ func TestRLockInvalidate(t *testing.T) {
 }
 
 /* Check if there is only one lockManager irrespective of the number of members in the ring */
-/*
-func TestLMDetector(t *testing.T) {
-	var numRings uint = 3
+func LMDetector(t *testing.T) {
+	<-time.After(100 * time.Millisecond)
+	var numRings uint = 2
 	var i uint
 	var err error
 	var trans *TCPTransport
@@ -315,7 +316,7 @@ func TestLMDetector(t *testing.T) {
 			conf := fastConf()
 			conf.Hostname = fmt.Sprintf("localhost:%d", PORT+1020+i)
 			conf.RingId = "a"
-			conf.NumVnodes = 2
+			conf.NumVnodes = 3
 			if i != 0 {
 				r[i], err = Join(conf, ml, "localhost:10020")
 				time.Sleep(100 * time.Millisecond)
@@ -327,10 +328,32 @@ func TestLMDetector(t *testing.T) {
 			}
 		}(i)
 	}
-
+	LMStatePoller := time.NewTicker(600 * time.Millisecond)
+	quit := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-LMStatePoller.C:
+				var lmCounter uint = 0
+				for i = 0; i < numRings; i++ {
+					for j := 0; r[i] != nil && j < len(r[i].vnodes); j++ {
+						if r[i].vnodes[j].lm.CurrentLM {
+							lmCounter++
+						}
+					}
+				}
+				if lmCounter != 1 {
+					t.Fatalf("Expected : One LockManager. Got ", lmCounter, " LockManagers instead")
+				}
+			case <-quit:
+				LMStatePoller.Stop()
+				return
+			}
+		}
+	}()
 	time.Sleep(700 * time.Millisecond)
+	quit <- true
 	for i = 0; i < numRings; i++ {
 		r[i].Shutdown()
 	}
 }
-*/

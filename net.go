@@ -162,7 +162,7 @@ func InitTCPTransport(listen string, timeout time.Duration) (*TCPTransport, erro
 	pool := make(map[string][]*tcpOutConn)
 
 	// Maximum age of a connection
-	maxIdle := time.Duration(300 * time.Second)
+	maxIdle := time.Duration(100 * time.Second)
 
 	// Setup the transport
 	tcp := &TCPTransport{sock: sock.(*net.TCPListener),

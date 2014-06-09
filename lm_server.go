@@ -33,8 +33,9 @@ type OpsLogEntry struct {
 //  In-memory implementation of LockManager that implements LManagerIntf
 type LManager struct {
 	//  Local state managed by the LockManager
-	Ring      *Ring //  This is to get the Ring's transport when the server has to send invalidations to lm_client cache
-	CurrentLM bool  // Boolean flag which says if the node is the current Lock Manager.
+	Ring      *Ring  //  This is to get the Ring's transport when the server has to send invalidations to lm_client cache
+	Vn        *Vnode //  The Vnode this LockManager is associated with
+	CurrentLM bool   // Boolean flag which says if the node is the current Lock Manager.
 
 	VersionMap map[string]uint        //  key-version mappings. A map of key to the corresponding version
 	RLocks     map[string]*RLockEntry // Will have the nodeSets for whom the RLocks have been provided for a key
@@ -89,24 +90,35 @@ func (lm *LManager) scheduleTimeoutTicker() {
 /* Regularly check if I am the LockManager */
 func (lm *LManager) ScheduleLMCheckTicker() {
 	lm.LMCheckTicker = time.NewTicker(500 * time.Millisecond)
-	//  var myVnode *localVnode
 	quit := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-lm.LMCheckTicker.C:
 				// Lookup for RingID
-				_, err := lm.Ring.Lookup(1, []byte(lm.Ring.config.RingId))
+				LMVnodes, err := lm.Ring.Lookup(1, []byte(lm.Ring.config.RingId))
 				if err != nil {
 					continue
 				}
-				/*myVnode = lm.Ring.vnodes[0]
-								if myVnode.String() == LMVnodes[0].String() {
-				                    // TODO
-								} else {
-				                    // TODO
-								}
-				*/
+				if lm.Vn.String() == LMVnodes[0].String() {
+					if lm.CurrentLM {
+						// No-op
+					} else {
+						lm.CurrentLM = true
+						/* TODO : I am the new LockManager, two cases :
+						   1. The previous LockManager died
+						   2. I just joined and figured out that I am the LockManager.
+						*/
+
+					}
+				} else {
+					if lm.CurrentLM {
+						//  I was the LockManager, now someone else has joined, give him the full LockState and set his CurrentLM when he is ready.
+					} else {
+						lm.CurrentLM = false
+						// No-op
+					}
+				}
 
 			case <-quit:
 				lm.LMCheckTicker.Stop()
