@@ -14,8 +14,6 @@ import (
 	"github.com/nictuku/nettools"
 )
 
-const LISTEN_TIMEOUT = 1000
-
 const ENOTINITIALIZED = -1
 const OK = 0
 

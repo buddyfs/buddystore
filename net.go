@@ -268,7 +268,6 @@ func (t *TCPTransport) networkCall(host string, tcpReqType int, req tcpRequest, 
 	errChan := make(chan error, 1)
 
 	go func() {
-		// Send a list command
 		out.header.ReqType = tcpReqType
 		if err := out.enc.Encode(&out.header); err != nil {
 			errChan <- err
