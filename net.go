@@ -67,6 +67,7 @@ const (
 	tcpCommitWLockReq
 	tcpAbortWLockReq
 	tcpInvalidateRLockReq
+	tcpJoinRingReq
 )
 
 type tcpHeader struct {
@@ -457,6 +458,17 @@ func (t *TCPTransport) PurgeVersions(target *Vnode, key string, maxVersion uint)
 		return err
 	} else {
 		return nil
+	}
+}
+
+func (t *TCPTransport) JoinRing(target *Vnode, ringId string, joiner *Vnode) ([]*Vnode, error) {
+	resp := tcpBodyJoinRingResp{}
+	err := t.networkCall(target.Host, tcpListReq, tcpBodyJoinRingReq{Target: target, RingId: ringId, Joiner: joiner}, &resp)
+
+	if err != nil {
+		return nil, err
+	} else {
+		return resp.Vnodes, nil
 	}
 }
 
@@ -1010,6 +1022,26 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vnode.Host, body.Vnode.String())
+			}
+
+		case tcpJoinRingReq:
+			body := tcpBodyJoinRingReq{}
+			if err := dec.Decode(&body); err != nil {
+				log.Printf("[ERR] Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, ok := t.get(body.Target)
+			resp := tcpBodyJoinRingResp{}
+			sendResp = &resp
+			if ok {
+				vnodes, err := obj.JoinRing(body.RingId, body.Joiner)
+				resp.Vnodes = vnodes
+				resp.Err = err
+			} else {
+				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String())
 			}
 
 		case tcpRLockReq:
