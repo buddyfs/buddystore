@@ -162,6 +162,10 @@ func (ml *MultiLocalTrans) PurgeVersions(target *Vnode, key string, maxVersion u
 	return fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
+func (ml *MultiLocalTrans) IsLocalVnode(vn *Vnode) bool {
+	panic("THIS METHOD SHOULD NEVER BE CALLED")
+}
+
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig("test")
 	if conf.Hostname != "test" {

@@ -105,4 +105,9 @@ func (mt *MockTransport) LeaveRing(target *Vnode, ringId string) error {
 	panic("Mock method not implemented")
 }
 
+func (mt *MockTransport) IsLocalVnode(vn *Vnode) bool {
+	args := mt.Mock.Called(vn)
+	return args.Bool(0)
+}
+
 var _ Transport = new(MockTransport)

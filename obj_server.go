@@ -12,7 +12,7 @@ type KVStoreValue struct {
 }
 
 type KVStore struct {
-	vn        *localVnode
+	vn        localVnodeIface
 	kv        map[string]*list.List
 	pred_list []*Vnode
 	succ_list []*Vnode
@@ -41,8 +41,9 @@ type KVStoreIntf interface {
 
 func (kvs *KVStore) init() error {
 	kvs.kv = make(map[string]*list.List)
-	kvs.pred_list = make([]*Vnode, kvs.vn.ring.config.NumSuccessors)
-	kvs.succ_list = make([]*Vnode, kvs.vn.ring.config.NumSuccessors)
+	r := kvs.vn.Ring()
+	kvs.pred_list = make([]*Vnode, r.GetNumSuccessors()+1)
+	kvs.succ_list = make([]*Vnode, r.GetNumSuccessors())
 
 	return nil
 }

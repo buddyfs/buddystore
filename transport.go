@@ -300,6 +300,11 @@ func (lt *LocalTransport) JoinRing(target *Vnode, ringId string, self *Vnode) ([
 	return vnodeRpc.JoinRing(ringId, self)
 }
 
+func (lt *LocalTransport) IsLocalVnode(target *Vnode) bool {
+	_, ok := lt.get(target)
+	return ok
+}
+
 // BlackholeTransport is used to provide an implemenation of the Transport that
 // does not actually do anything. Any operation will result in an error.
 type BlackholeTransport struct {

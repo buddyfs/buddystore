@@ -13,5 +13,7 @@ A TCPTransport is provided that can be used as a reliable Chord RPC mechanism.
 
 # Documentation
 
+[![GoDoc](https://godoc.org/github.com/buddyfs/buddystore?status.png)](https://godoc.org/github.com/buddyfs/buddystore)
+
 To view the online documentation, go [here](http://godoc.org/github.com/buddyfs/buddystore).
 

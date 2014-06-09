@@ -70,6 +70,9 @@ type Transport interface {
 	// Tracker operations
 	JoinRing(target *Vnode, ringId string, self *Vnode) ([]*Vnode, error)
 	LeaveRing(target *Vnode, ringId string) error
+
+	// TODO: Is this the right place?
+	IsLocalVnode(vn *Vnode) bool
 }
 
 // These are the methods to invoke on the registered vnodes
@@ -130,6 +133,15 @@ type Vnode struct {
 	Host string // Host identifier
 }
 
+type localVnodeIface interface {
+	Ring() RingIntf
+	Successors() []*Vnode
+	Predecessors() []*Vnode
+	Predecessor() *Vnode
+	localVnodeId() []byte
+	GetVnode() *Vnode
+}
+
 // Represents a local Vnode
 type localVnode struct {
 	Vnode
@@ -145,6 +157,28 @@ type localVnode struct {
 	lm           *LManager
 	lm_client    *LManagerClient
 	tracker      Tracker
+
+	// Implements:
+	localVnodeIface
+}
+
+func (lvn *localVnode) Ring() RingIntf {
+	return lvn.ring
+}
+func (lvn *localVnode) Successors() []*Vnode {
+	return lvn.successors
+}
+func (lvn *localVnode) Predecessors() []*Vnode {
+	return lvn.predecessors
+}
+func (lvn *localVnode) Predecessor() *Vnode {
+	return lvn.predecessor
+}
+func (lvn *localVnode) localVnodeId() []byte {
+	return lvn.Id
+}
+func (lvn *localVnode) GetVnode() *Vnode {
+	return &lvn.Vnode
 }
 
 type RingIntf interface {
@@ -155,6 +189,7 @@ type RingIntf interface {
 	GetNumSuccessors() int
 	GetLocalVnode() *Vnode
 	GetRingId() string
+	GetHashFunc() func() hash.Hash
 }
 
 // Stores the state required for a Chord ring
@@ -312,4 +347,8 @@ func (r *Ring) GetLocalVnode() *Vnode {
 	// TODO: Questionable code
 	// Is vnodes[0] always going to be a local node?
 	return &r.vnodes[0].Vnode
+}
+
+func (r *Ring) GetHashFunc() func() hash.Hash {
+	return r.config.HashFunc
 }
