@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"strconv"
 	"sync"
 
 	"github.com/anupcshan/Taipei-Torrent/torrent"
 	"github.com/golang/glog"
 	"github.com/nictuku/nettools"
 )
-
-const LISTEN_TIMEOUT = 1000
 
 const ENOTINITIALIZED = -1
 const OK = 0
@@ -66,8 +66,20 @@ func (bs *BuddyStore) init() error {
 	io.WriteString(h, BUDDYSTORE_INFOHASH_BASE)
 	infohash := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
 
+	var peeridBase = bs.Config.MyID
 	h = sha1.New()
-	io.WriteString(h, bs.Config.MyID)
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				continue
+			}
+			peeridBase = iface.HardwareAddr.String()
+			break
+		}
+	}
+	glog.Infof("Peerid base: %s", peeridBase)
+	io.WriteString(h, peeridBase)
 	peerid := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
 
 	glog.Infof("Announcing to tracker %s about infohash '%s' using peerid '%s' on port %d", TRACKER_URL, infohash, peerid, port)
@@ -86,6 +98,14 @@ func (bs *BuddyStore) init() error {
 		log.Println("Tracker gave us", len(peers)/PEERLEN, "peers")
 		for i := 0; i < len(peers); i += PEERLEN {
 			peer := nettools.BinaryToDottedPort(peers[i : i+PEERLEN])
+			_, prt, _ := net.SplitHostPort(peer)
+			if prt == strconv.Itoa(port) {
+				glog.Infoln("Skipping self as peer")
+				// TODO: Hack to make sure we don't connect to ourselves.
+				// To be more correct, we should check hostname as well.
+				continue
+			}
+
 			glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
 			bs.GlobalRing, err = Join(conf, transport, peer)
 
