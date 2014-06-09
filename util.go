@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/huin/goupnp/dcps/internetgateway1"
 )
 
 // Generates a random stabilization time
@@ -135,6 +136,30 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 		// TODO: What if transport fails?
 		// Most likely cause: listen port conflict
 		panic("TODO: Is another process listening on this port?")
+	}
+
+	/*
+		upnpDisc, err := torrent.Discover()
+
+		if err == nil {
+			_, err = upnpDisc.AddPortMapping("tcp", port, port, "BuddyStore", 3600)
+			glog.Infof("Added port mapping: %s", err)
+		} else {
+			glog.Infof("Error discovering upnp: %s", err)
+		}
+	*/
+
+	upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
+	glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
+
+	if err == nil {
+		/*
+			addr, err := upnpclient[0].GetExternalIPAddress()
+			glog.Infof("External IP: %s, err: %s", addr, err)
+		*/
+
+		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), "10.0.0.100", true, "BuddyStooore", 0)
+		glog.Infof("Added port mapping: %s", err)
 	}
 
 	conf := DefaultConfig(listen)
