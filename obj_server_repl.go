@@ -258,6 +258,12 @@ func (kvs *KVStore) handleSyncKeys(ownerVn *Vnode, key string, ver []uint) {
 	kvLst, found := kvs.kv[key]
 
 	if !found {
+		_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(ownerVn)
+
+		if !ok {
+			kvs.vn.Ring().Transport().(*LocalTransport).remote.MissingKeys(ownerVn, kvs.vn.GetVnode(), key, ver)
+		}
+
 		return
 	}
 
@@ -276,6 +282,10 @@ func (kvs *KVStore) handleSyncKeys(ownerVn *Vnode, key string, ver []uint) {
 		if present == false {
 			retVer = append(retVer, version)
 		}
+	}
+
+	if len(retVer) == 0 {
+		return
 	}
 
 	_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(ownerVn)
