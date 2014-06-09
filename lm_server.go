@@ -28,6 +28,10 @@ type OpsLogEntry struct {
 	Key     string     //  Key on which the operation was performed
 	Version uint       //  Version number of the Key
 	Timeout *time.Time // Timeout setting if any. For instance, WLocks have timeouts associated with them. When the primary fails, the second should know when to invalidate that entry
+
+    // For handling replication. Nodes should be able to reconstruct the state using this log
+    NodeSet []string    //  2D array. Maps nodeID and remote address. Used for RLock calls to maintain nodesets
+    LockID  string  //  For RLocks and WLocks, the LockID which the primary LM used should be replicated to the secondaries. Do not generate new LockIDs in the secondary
 }
 
 //  In-memory implementation of LockManager that implements LManagerIntf
