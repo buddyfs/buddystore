@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"sync"
 
 	"github.com/anupcshan/Taipei-Torrent/torrent"
@@ -66,8 +67,20 @@ func (bs *BuddyStore) init() error {
 	io.WriteString(h, BUDDYSTORE_INFOHASH_BASE)
 	infohash := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
 
+	var peeridBase = bs.Config.MyID
 	h = sha1.New()
-	io.WriteString(h, bs.Config.MyID)
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				continue
+			}
+			peeridBase = iface.HardwareAddr.String()
+			break
+		}
+	}
+	glog.Infof("Peerid base: %s", peeridBase)
+	io.WriteString(h, peeridBase)
 	peerid := hex.EncodeToString(h.Sum([]byte(nil)))[:20]
 
 	glog.Infof("Announcing to tracker %s about infohash '%s' using peerid '%s' on port %d", TRACKER_URL, infohash, peerid, port)

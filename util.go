@@ -138,6 +138,7 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 	}
 
 	conf := DefaultConfig(listen)
+	conf.Hostname = listen
 
 	return port, transport, conf
 }
