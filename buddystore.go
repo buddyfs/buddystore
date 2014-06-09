@@ -106,14 +106,18 @@ func (bs *BuddyStore) init() error {
 				continue
 			}
 
-			glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
+			if glog.V(2) {
+				glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
+			}
 			bs.GlobalRing, err = Join(conf, transport, peer)
 
 			if err == nil {
 				glog.Infof("Successfully joined chord ring using peer %s", peer)
 				break
 			} else {
-				glog.Infof("Failed to contact peer with error: %s", err)
+				if glog.V(2) {
+					glog.Infof("Failed to contact peer with error: %s", err)
+				}
 			}
 
 			bs.GlobalRing = nil
