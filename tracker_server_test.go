@@ -68,7 +68,7 @@ func TestTrackerJoinTimeout(t *testing.T) {
 
 	// TODO: Ideally, we'll be using some kind of a fake clock to do this.
 	// Time pressure :\
-	time.Sleep(1 * time.Second)
+	time.Sleep(1500 * time.Millisecond)
 
 	existing, err = tr.handleJoinRing(ringId, vnode2)
 	assert.NoError(t, err)
