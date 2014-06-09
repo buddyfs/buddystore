@@ -1,6 +1,7 @@
 package buddystore
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -86,8 +87,58 @@ func (kvs *KVStore) localRepl() {
 }
 
 func (kvs *KVStore) globalRepl() {
+	var last_pred *Vnode
+	var num_pred int
+
 	kvs.kvLock.Lock()
-	defer kvs.kvLock.Unlock()
+
+	for i := 0; i < len(kvs.pred_list); i++ {
+		if kvs.pred_list[i] != nil {
+			num_pred++
+		}
+	}
+
+	if num_pred <= kvs.vn.ring.config.NumSuccessors {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	last_pred = kvs.pred_list[num_pred-1]
+
+	if last_pred == nil {
+		kvs.kvLock.Unlock()
+		return
+	}
+
+	kvs.kvLock.Unlock()
+
+	var wg sync.WaitGroup
+	var tokens chan bool
+
+	tokens = make(chan bool, MaxReplParallelism)
+
+	for i := 0; i < MaxReplParallelism; i++ {
+		tokens <- true
+	}
+
+	for key := range kvs.kv {
+		if !(betweenRightIncl(last_pred.Id, kvs.vn.Id, []byte(key))) {
+
+			succ_list, err := kvs.vn.ring.Lookup(1, []byte(key))
+
+			if err == nil {
+				if succ_list[0] != nil {
+
+					wg.Add(1)
+					go kvs.sendSyncKeys(succ_list[0], key)
+				}
+			} else {
+				fmt.Errorf("Global Repl: Look up failed")
+			}
+		}
+	}
+
+	wg.Wait()
 
 	return
 }
