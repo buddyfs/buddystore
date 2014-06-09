@@ -300,7 +300,7 @@ func TestRLockInvalidate(t *testing.T) {
 /* Check if there is only one lockManager irrespective of the number of members in the ring */
 func LMDetector(t *testing.T) {
 	<-time.After(100 * time.Millisecond)
-	var numRings uint = 2
+	var numRings uint = 5
 	var i uint
 	var err error
 	var trans *TCPTransport

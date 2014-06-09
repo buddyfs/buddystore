@@ -210,9 +210,9 @@ func TestCreateShutdown(t *testing.T) {
 	_ = runtime.NumGoroutine()
 	// The following will not be true because of the multiple polling mechanisms and replications that might be going on
 	/*
-	    if after != numGo {
-			t.Fatalf("unexpected routines! A:%d B:%d", after, numGo)
-		}
+		    if after != numGo {
+				t.Fatalf("unexpected routines! A:%d B:%d", after, numGo)
+			}
 	*/
 }
 
