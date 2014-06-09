@@ -123,7 +123,7 @@ func printLogs(opsLog []*OpsLogEntry) {
 	fmt.Println()
 }
 
-func CreateNewTCPTransport() (Transport, *Config) {
+func CreateNewTCPTransport() (int, Transport, *Config) {
 	port := int(rand.Uint32()%(64512) + 1024)
 	glog.Infof("PORT: %d", port)
 
@@ -139,5 +139,5 @@ func CreateNewTCPTransport() (Transport, *Config) {
 
 	conf := DefaultConfig(listen)
 
-	return transport, conf
+	return port, transport, conf
 }
