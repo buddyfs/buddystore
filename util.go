@@ -126,12 +126,37 @@ func printLogs(opsLog []*OpsLogEntry) {
 	fmt.Println()
 }
 
+func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
+	upnpclient, _, err := internetgateway1.NewWANIPConnection1Clients()
+	if err != nil {
+		externalAddr, err = upnpclient[0].GetExternalIPAddress()
+		glog.Infof("External IP: %s, err: %s", externalAddr, err)
+	}
+
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				continue
+			}
+			addrs, _ := iface.Addrs()
+			glog.Infof("Address: %s", addrs[0].(*net.IPNet).IP.String())
+			localAddr = addrs[0].(*net.IPNet).IP.String()
+			return
+		}
+	}
+
+	return
+}
+
 func CreateNewTCPTransport() (int, Transport, *Config) {
 	port := int(rand.Uint32()%(64512) + 1024)
 	glog.Infof("PORT: %d", port)
 
 	listen := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 	glog.Infof("Listen Address: %s", listen)
+
+	localAddr, externalAddr := GetLocalExternalAddresses()
 
 	transport, err := InitTCPTransport(listen, LISTEN_TIMEOUT)
 	if err != nil {
@@ -140,45 +165,20 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 		panic("TODO: Is another process listening on this port?")
 	}
 
-	/*
-		upnpDisc, err := torrent.Discover()
-
-		if err == nil {
-			_, err = upnpDisc.AddPortMapping("tcp", port, port, "BuddyStore", 3600)
-			glog.Infof("Added port mapping: %s", err)
-		} else {
-			glog.Infof("Error discovering upnp: %s", err)
-		}
-	*/
-
 	upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
 	glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
 
 	if err == nil {
-		/*
-			addr, err := upnpclient[0].GetExternalIPAddress()
-			glog.Infof("External IP: %s, err: %s", addr, err)
-		*/
-
-		ifaces, err := net.Interfaces()
-		if err == nil {
-			for _, iface := range ifaces {
-				if iface.Flags&net.FlagLoopback == net.FlagLoopback {
-					continue
-				}
-				addrs, _ := iface.Addrs()
-				glog.Infof("Address: %s", addrs[0].(*net.IPNet).IP.String())
-				addr := addrs[0].(*net.IPNet).IP.String()
-
-				err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), addr, true, "BuddyStore", 0)
-				glog.Infof("Added port mapping: %s", err)
-				break
-			}
-		}
+		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), localAddr, true, "BuddyStore", 0)
+		glog.Infof("Added port mapping: %s", err)
 	}
 
 	conf := DefaultConfig(listen)
-	conf.Hostname = listen
+	if len(externalAddr) > 0 {
+		conf.Hostname = net.JoinHostPort(externalAddr, strconv.Itoa(port))
+	} else {
+		conf.Hostname = net.JoinHostPort(localAddr, strconv.Itoa(port))
+	}
 
 	return port, transport, conf
 }

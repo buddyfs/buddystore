@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"hash"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 // Implements the methods needed for a Chord ring
@@ -209,6 +211,8 @@ func Join(conf *Config, trans Transport, existing string) (*Ring, error) {
 	if hosts == nil || len(hosts) == 0 {
 		return nil, fmt.Errorf("Remote host has no vnodes!")
 	}
+
+	glog.Infof("Fetched hosts: %s", hosts)
 
 	// Create a ring
 	ring := &Ring{}
