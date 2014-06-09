@@ -160,8 +160,21 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 			glog.Infof("External IP: %s, err: %s", addr, err)
 		*/
 
-		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), "10.0.0.100", true, "BuddyStooore", 0)
-		glog.Infof("Added port mapping: %s", err)
+		ifaces, err := net.Interfaces()
+		if err == nil {
+			for _, iface := range ifaces {
+				if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+					continue
+				}
+				addrs, _ := iface.Addrs()
+				glog.Infof("Address: %s", addrs[0].(*net.IPNet).IP.String())
+				addr := addrs[0].(*net.IPNet).IP.String()
+
+				err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), addr, true, "BuddyStore", 0)
+				glog.Infof("Added port mapping: %s", err)
+				break
+			}
+		}
 	}
 
 	conf := DefaultConfig(listen)
