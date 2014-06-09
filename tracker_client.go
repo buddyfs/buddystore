@@ -35,7 +35,7 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, self *Vnode) (*Ring, error)
 		glog.Infof("Transport: %q", tr.ring.Transport())
 	*/
 
-	transport, conf := CreateNewTCPTransport()
+	_, transport, conf := CreateNewTCPTransport()
 
 	vnodes, err := tr.ring.Transport().JoinRing(trackerNodes[0], ringId, self)
 
