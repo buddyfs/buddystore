@@ -25,8 +25,8 @@ func (kvs *KVStore) localRepl() {
 		}
 	}
 
-	if num_pred > kvs.vn.ring.config.NumSuccessors {
-		num_pred = kvs.vn.ring.config.NumSuccessors
+	if num_pred > kvs.vn.Ring().GetNumSuccessors() {
+		num_pred = kvs.vn.Ring().GetNumSuccessors()
 	}
 
 	first_pred = kvs.pred_list[0]
@@ -70,12 +70,12 @@ func (kvs *KVStore) localRepl() {
 	for key := range kvs.kv {
 
 		// Hash the key
-		h := kvs.vn.ring.config.HashFunc()
+		h := kvs.vn.Ring().GetHashFunc()()
 		h.Write([]byte(key))
 		key_hash := h.Sum(nil)
 
 		if first_succ != nil {
-			if betweenRightIncl(last_pred.Id, kvs.vn.Id, key_hash) {
+			if betweenRightIncl(last_pred.Id, kvs.vn.localVnodeId(), key_hash) {
 				wg.Add(1)
 				go kvs.sendSyncKeys(first_succ, key, &wg, tokens)
 			}
@@ -104,7 +104,7 @@ func (kvs *KVStore) globalRepl() {
 		}
 	}
 
-	if num_pred <= kvs.vn.ring.config.NumSuccessors {
+	if num_pred <= kvs.vn.Ring().GetNumSuccessors() {
 		kvs.kvLock.Unlock()
 		return
 	}
@@ -129,13 +129,13 @@ func (kvs *KVStore) globalRepl() {
 
 	for key := range kvs.kv {
 		// Hash the key
-		h := kvs.vn.ring.config.HashFunc()
+		h := kvs.vn.Ring().GetHashFunc()()
 		h.Write([]byte(key))
 		key_hash := h.Sum(nil)
 
-		if !(betweenRightIncl(last_pred.Id, kvs.vn.Id, key_hash)) {
+		if !(betweenRightIncl(last_pred.Id, kvs.vn.localVnodeId(), key_hash)) {
 
-			succ_list, err := kvs.vn.ring.Lookup(1, []byte(key))
+			succ_list, err := kvs.vn.Ring().Lookup(1, []byte(key))
 
 			if err == nil {
 				if succ_list[0] != nil {
@@ -172,10 +172,10 @@ func (kvs *KVStore) sendSyncKeys(target *Vnode, key string, wg *sync.WaitGroup, 
 		ver = append(ver, i.Value.(*KVStoreValue).Ver)
 	}
 
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(target)
+	_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(target)
 
 	if !ok {
-		kvs.vn.ring.transport.(*LocalTransport).remote.SyncKeys(target, &kvs.vn.Vnode, key, ver)
+		kvs.vn.Ring().Transport().(*LocalTransport).remote.SyncKeys(target, kvs.vn.GetVnode(), key, ver)
 	}
 
 	tokens <- true
@@ -188,22 +188,22 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 	var errs []error
 
 	tokens = make(chan bool, MaxIncSyncParallelism)
-	errs = make([]error, len(kvs.vn.successors))
+	errs = make([]error, len(kvs.vn.Successors()))
 
 	for i := 0; i < MaxIncSyncParallelism; i++ {
 		tokens <- true
 	}
 
 	// Hash the key
-	h := kvs.vn.ring.config.HashFunc()
+	h := kvs.vn.Ring().GetHashFunc()()
 	h.Write([]byte(key))
 	key_hash := h.Sum(nil)
 
 	// If we are the owner of the key, replicate the KV to the
 	// successors
-	if (kvs.vn.predecessor == nil) || ((kvs.vn.predecessor != nil) && (betweenRightIncl(kvs.vn.predecessor.Id, kvs.vn.Id, key_hash))) {
+	if (kvs.vn.Predecessor() == nil) || ((kvs.vn.Predecessor() != nil) && (betweenRightIncl(kvs.vn.Predecessor().Id, kvs.vn.localVnodeId(), key_hash))) {
 
-		for idx, succVn := range kvs.vn.successors {
+		for idx, succVn := range kvs.vn.Successors() {
 			if succVn != nil {
 				wg.Add(1)
 
@@ -213,7 +213,7 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 
 		wg.Wait()
 
-		for idx := range kvs.vn.successors {
+		for idx := range kvs.vn.Successors() {
 			if errs[idx] != nil {
 				return errs[idx]
 			}
@@ -228,10 +228,10 @@ func (kvs *KVStore) incSyncToSucc(succVn *Vnode, key string, version uint, value
 
 	<-tokens
 
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(succVn)
+	ok := kvs.vn.Ring().Transport().IsLocalVnode(succVn)
 
 	if !ok {
-		kvs.vn.ring.transport.(*LocalTransport).remote.Set(succVn, key, version, value)
+		kvs.vn.Ring().Transport().Set(succVn, key, version, value)
 	}
 
 	tokens <- true
@@ -278,10 +278,10 @@ func (kvs *KVStore) handleSyncKeys(ownerVn *Vnode, key string, ver []uint) {
 		}
 	}
 
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(ownerVn)
+	_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(ownerVn)
 
 	if !ok {
-		kvs.vn.ring.transport.(*LocalTransport).remote.MissingKeys(ownerVn, &kvs.vn.Vnode, key, retVer)
+		kvs.vn.Ring().Transport().(*LocalTransport).remote.MissingKeys(ownerVn, kvs.vn.GetVnode(), key, retVer)
 	}
 
 	return
@@ -323,10 +323,10 @@ func (kvs *KVStore) handleMissingKeys(replVn *Vnode, key string, ver []uint) {
 		}
 	}
 
-	_, ok := kvs.vn.ring.transport.(*LocalTransport).get(replVn)
+	_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(replVn)
 
 	if !ok {
-		kvs.vn.ring.transport.(*LocalTransport).remote.BulkSet(replVn, key, valueLst)
+		kvs.vn.Ring().Transport().(*LocalTransport).remote.BulkSet(replVn, key, valueLst)
 	}
 
 	return

@@ -1,11 +1,16 @@
 package buddystore
 
-import "github.com/stretchr/testify/mock"
+import (
+	"hash"
+
+	"github.com/stretchr/testify/mock"
+)
 
 type MockRing struct {
 	mock.Mock
 	transport     Transport
 	numSuccessors int
+	hashfunc      func() hash.Hash
 }
 
 func (m MockRing) GetNumSuccessors() int {
@@ -43,6 +48,10 @@ func (m MockRing) GetLocalVnode() *Vnode {
 
 func (m MockRing) GetRingId() string {
 	panic("TODO: MockRing.GetRingId")
+}
+
+func (m MockRing) GetHashFunc() func() hash.Hash {
+	return m.hashfunc
 }
 
 var _ RingIntf = new(MockRing)
