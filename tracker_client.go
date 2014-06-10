@@ -3,7 +3,7 @@ package buddystore
 import "fmt"
 
 type TrackerClient interface {
-	JoinRing(string, *Vnode) (*Ring, error)
+	JoinRing(string, bool) (*Ring, error)
 	LeaveRing(string) error
 }
 
@@ -17,7 +17,7 @@ func NewTrackerClient(ring RingIntf) TrackerClient {
 
 const NUM_TRACKER_REPLICAS = 2
 
-func (tr *TrackerClientImpl) JoinRing(ringId string, self *Vnode) (*Ring, error) {
+func (tr *TrackerClientImpl) JoinRing(ringId string, localOnly bool) (*Ring, error) {
 	trackerNodes, err := tr.ring.Lookup(NUM_TRACKER_REPLICAS, []byte(ringId))
 
 	if err != nil {
@@ -28,9 +28,9 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, self *Vnode) (*Ring, error)
 		return nil, fmt.Errorf("Unable to get any successors while trying to join ring")
 	}
 
-	_, transport, conf := CreateNewTCPTransport()
+	_, transport, conf := CreateNewTCPTransport(localOnly)
 
-	vnodes, err := tr.ring.Transport().JoinRing(trackerNodes[0], ringId, self)
+	vnodes, err := tr.ring.Transport().JoinRing(trackerNodes[0], ringId, &Vnode{Host: conf.Hostname})
 
 	if err != nil {
 		return nil, err

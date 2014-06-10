@@ -154,14 +154,14 @@ func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 	return
 }
 
-func CreateNewTCPTransport() (int, Transport, *Config) {
+func CreateNewTCPTransport(localOnly bool) (int, Transport, *Config) {
+	var localAddr, externalAddr string
+
 	port := int(rand.Uint32()%(64512) + 1024)
 	glog.Infof("PORT: %d", port)
 
 	listen := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
 	glog.Infof("Listen Address: %s", listen)
-
-	localAddr, externalAddr := GetLocalExternalAddresses()
 
 	transport, err := InitTCPTransport(listen, LISTEN_TIMEOUT)
 	if err != nil {
@@ -170,12 +170,18 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 		panic("TODO: Is another process listening on this port?")
 	}
 
-	upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
-	glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
+	if !localOnly {
+		localAddr, externalAddr = GetLocalExternalAddresses()
+		upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
+		glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
 
-	if err == nil && len(upnpclient) > 0 {
-		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), localAddr, true, "BuddyStore", 0)
-		glog.Infof("Added port mapping: %s", err)
+		if err == nil && len(upnpclient) > 0 {
+			err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), localAddr, true, "BuddyStore", 0)
+			glog.Infof("Added port mapping: %s", err)
+		}
+	} else {
+		localAddr = "localhost"
+		externalAddr = "localhost"
 	}
 
 	conf := DefaultConfig(listen)
