@@ -42,20 +42,11 @@ type Transport interface {
 	// Register for an RPC callbacks
 	Register(*Vnode, VnodeRPC)
 
-	//  Method to create the request message for RLock from client
+	// Lock Manager operations
 	RLock(*Vnode, string, string) (string, uint, error)
-
-	//  Method to create the request message for WLock from client
-	// TODO : Discuss : For WriteLocks the server doesn't need to remember to whom it gave the lock?
-	WLock(*Vnode, string, uint, uint, string) (string, uint, uint, error)
-
-	//  Method to commit a write
+	WLock(*Vnode, string, uint, uint, string, *OpsLogEntry) (string, uint, uint, uint64, error)
 	CommitWLock(*Vnode, string, uint, string) error
-
-	//  Method to abort a write
 	AbortWLock(*Vnode, string, uint, string) error
-
-	//  Method to invalidate a client's RLock cache entry
 	InvalidateRLock(*Vnode, string) error
 
 	// KV Store operations
@@ -96,7 +87,7 @@ type VnodeRPC interface {
 
 	// Lock Manager operations
 	RLock(key string, nodeID string, remoteAddr string) (string, uint, error)
-	WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error)
+	WLock(key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error)
 	CommitWLock(key string, version uint, nodeID string) error
 	AbortWLock(key string, version uint, nodeID string) error
 	InvalidateRLock(lockID string) error

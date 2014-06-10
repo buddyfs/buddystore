@@ -86,7 +86,7 @@ func (lm *LManagerClient) WLock(key string, version uint, timeout uint) (uint, e
 		return 0, err
 	}
 
-	retLockID, ver, timeout, err := lm.Ring.Transport().WLock(LMVnodes[0], key, version, timeout, "testNodeId")
+	retLockID, ver, timeout, _, err := lm.Ring.Transport().WLock(LMVnodes[0], key, version, timeout, lm.Vnode.String(), nil)
 	if err != nil {
 		return ver, fmt.Errorf("Cannot get the write lock ", err)
 	}

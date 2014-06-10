@@ -16,17 +16,19 @@ type tcpBodyLMRLockResp struct {
 }
 
 type tcpBodyLMWLockReq struct {
-	Vn       *Vnode
-	SenderID string
-	Key      string
-	Version  uint
-	Timeout  uint
+	Vn                 *Vnode
+	SenderID           string
+	Key                string
+	Version            uint
+	Timeout            uint
+	OpsLogEntryPrimary *OpsLogEntry
 }
 
 type tcpBodyLMWLockResp struct {
-	LockId  string
-	Version uint
-	Timeout uint
+	LockId      string
+	Version     uint
+	Timeout     uint
+	CommitPoint uint64
 
 	// Extends:
 	tcpResponseImpl

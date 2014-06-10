@@ -46,7 +46,7 @@ func (mt *MockTransport) RLock(*Vnode, string, string) (string, uint, error) {
 	panic("Mock method not implemented")
 }
 
-func (mt *MockTransport) WLock(*Vnode, string, uint, uint, string) (string, uint, uint, error) {
+func (mt *MockTransport) WLock(*Vnode, string, uint, uint, string, *OpsLogEntry) (string, uint, uint, uint64, error) {
 	panic("Mock method not implemented")
 }
 

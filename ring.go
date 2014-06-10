@@ -16,10 +16,10 @@ func (r *Ring) init(conf *Config, trans Transport) {
 	// Initializes the vnodes
 	for i := 0; i < conf.NumVnodes; i++ {
 		vn := &localVnode{}
-		vn.lm = &LManager{Vn: &vn.Vnode}
-		vn.lm.ScheduleLMCheckTicker()
+		vn.lm = &LManager{Vn: &vn.Vnode, OpsLog: make([]*OpsLogEntry, 0), CommitPoint: 0, CommitIndex: -1, ApplPoint: 0, ApplIndex: -1}
+		// vn.lm.ScheduleLMCheckTicker()
 		vn.lm.Ring = r // Because the LockManager needs to access transport for Cache Invalidation
-		vn.lm_client = &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+		vn.lm_client = &LManagerClient{Vnode: &vn.Vnode, Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 		r.vnodes[i] = vn
 		vn.ring = r
 		vn.init(i)

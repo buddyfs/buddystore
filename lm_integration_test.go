@@ -20,14 +20,17 @@ func TestWriteLock(t *testing.T) {
 	}
 
 	var conf *Config = fastConf()
+    conf.NumVnodes = 5
+	conf.StabilizeMin = 50 * time.Millisecond
+	conf.StabilizeMax = 100 * time.Millisecond
 	r, err := Create(conf, trans)
 	if err != nil {
 		t.Fatal(err)
 	}
+    // Wait for stabilization
+	time.Sleep(150 * time.Millisecond)
 
-	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-
-	version, err := lm.WLock(TEST_KEY, 1, 10)
+	version, err := r.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
 	if err != nil {
 		t.Fatalf("Error while getting write lock : ", err)
 	}

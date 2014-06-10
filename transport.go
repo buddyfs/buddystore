@@ -188,12 +188,12 @@ func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (str
 	return lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
 }
 
-func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 	lmVnodeRpc, ok := lt.get(targetLm)
 	if !ok {
-		return lt.remote.WLock(targetLm, key, version, timeout, nodeID)
+		return lt.remote.WLock(targetLm, key, version, timeout, nodeID, opsLogEntry)
 	}
-	return lmVnodeRpc.WLock(key, version, timeout, nodeID)
+	return lmVnodeRpc.WLock(key, version, timeout, nodeID, opsLogEntry)
 }
 
 func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
@@ -351,8 +351,8 @@ func (*BlackholeTransport) RLock(v *Vnode, key string, nodeID string) (string, u
 	return "", 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	return "", 0, 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+func (*BlackholeTransport) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
+	return "", 0, 0, 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
 func (*BlackholeTransport) CommitWLock(v *Vnode, key string, version uint, nodeID string) error {

@@ -611,14 +611,14 @@ Param version : The version of the key
 Param timeout : Requested Timeout value.
 Param NodeID : NodeID of the requesting node
 */
-func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
+func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 	resp := tcpBodyLMWLockResp{}
-	err := t.networkCall(target.Host, tcpWLockReq, tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID}, &resp)
+	err := t.networkCall(target.Host, tcpWLockReq, tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID, OpsLogEntryPrimary: opsLogEntry}, &resp)
 
 	if err != nil {
-		return "", 0, 0, resp.Err
+		return "", 0, 0, 0, resp.Err
 	} else {
-		return resp.LockId, resp.Version, resp.Timeout, nil
+		return resp.LockId, resp.Version, resp.Timeout, resp.CommitPoint, nil
 	}
 }
 
@@ -1080,13 +1080,14 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyLMWLockResp{}
 			sendResp = &resp
 			if ok {
-				lockId, version, timeout, err :=
-					obj.WLock(body.Key, body.Version, body.Timeout, body.SenderID)
+				lockId, version, timeout, commitPoint, err :=
+					obj.WLock(body.Key, body.Version, body.Timeout, body.SenderID, body.OpsLogEntryPrimary)
 
 				resp.Err = err
 				resp.LockId = lockId
 				resp.Version = version
 				resp.Timeout = timeout
+				resp.CommitPoint = commitPoint
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())

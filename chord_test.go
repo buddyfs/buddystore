@@ -110,8 +110,8 @@ func (ml *MultiLocalTrans) RLock(v *Vnode, key string, nodeID string) (string, u
 	return "", 0, fmt.Errorf("RLock in MultiLocalTransport not implemented yet")
 }
 
-func (ml *MultiLocalTrans) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	return "", 0, 0, fmt.Errorf("WLock in MultiLocalTransport not implemented yet")
+func (ml *MultiLocalTrans) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
+	return "", 0, 0, 0, fmt.Errorf("WLock in MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) CommitWLock(v *Vnode, key string, version uint, nodeID string) error {

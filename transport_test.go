@@ -73,8 +73,8 @@ func (mv *MockVnodeRPC) RLock(key string, nodeID string, remoteAddr string) (str
 	return "", 0, nil
 }
 
-func (mv *MockVnodeRPC) WLock(key string, version uint, timeout uint, nodeID string) (string, uint, uint, error) {
-	return "", 0, 0, nil
+func (mv *MockVnodeRPC) WLock(key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
+	return "", 0, 0, 0, nil
 }
 
 func (mv *MockVnodeRPC) CommitWLock(key string, version uint, nodeID string) error {
