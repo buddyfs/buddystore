@@ -1,11 +1,11 @@
 package buddystore
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
 	"time"
-    "bytes"
 )
 
 // Converts the ID to string
@@ -215,38 +215,38 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 			conf.Delegate.NewPredecessor(&vn.Vnode, maybe_pred, old)
 		})
 
-        // If there is a change in the predecessor, my LockManager status might change.
-        if (vn.predecessor==nil && maybe_pred!=nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0  {
-            fmt.Println("Triggering LockManager check")
-            LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
-            if err != nil {
-                fmt.Println("Lookup for LockManager failed with error ", err)
-            }
-            fmt.Println("Got the following as the LockManager " , LMVnodes)
-            if vn.String() == LMVnodes[0].String() {
-                if vn.lm.CurrentLM {
-                    // No-op
-                } else {
-                    vn.lm.CurrentLM = true
-                    /* TODO : I am the new LockManager, two cases :
-                    1. The previous LockManager died
-                    2. I just joined and figured out that I am the LockManager.
-                    */
+		// If there is a change in the predecessor, my LockManager status might change.
+		if (vn.predecessor == nil && maybe_pred != nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0 {
+			fmt.Println("Triggering LockManager check")
+			LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
+			if err != nil {
+				fmt.Println("Lookup for LockManager failed with error ", err)
+			}
+			fmt.Println("Got the following as the LockManager ", LMVnodes)
+			if vn.String() == LMVnodes[0].String() {
+				if vn.lm.CurrentLM {
+					// No-op
+				} else {
+					vn.lm.CurrentLM = true
+					/* TODO : I am the new LockManager, two cases :
+					   1. The previous LockManager died
+					   2. I just joined and figured out that I am the LockManager.
+					*/
 
-                }
-            } else {
-                if vn.lm.CurrentLM {
-                    //  I was the LockManager (or I am the one with the best knowledge of the previous LM) , now someone else has joined, give him the full LockState and set his CurrentLM when he is ready.
-                } else {
-                    vn.lm.CurrentLM = false
-                    // No-op
-                }
-            }
-        }
+				}
+			} else {
+				if vn.lm.CurrentLM {
+					//  I was the LockManager (or I am the one with the best knowledge of the previous LM) , now someone else has joined, give him the full LockState and set his CurrentLM when he is ready.
+				} else {
+					vn.lm.CurrentLM = false
+					// No-op
+				}
+			}
+		}
 
 		vn.predecessor = maybe_pred
-        vn.predecessors[0] = maybe_pred
-    }
+		vn.predecessors[0] = maybe_pred
+	}
 
 	// Return our successors list
 	return vn.successors, nil

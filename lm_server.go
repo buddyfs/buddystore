@@ -287,46 +287,46 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 
 	// If current LockManager, replicate the operation to the next two nodes
 	if lm.CurrentLM {
-        vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
-        if err != nil {
-            return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
-        }
-        for i := range vnodes {
-            if vnodes[i] != nil {
-                _, _, _, _, err := lm.Ring.Transport().WLock(vnodes[i], key, version, timeout, lm.Vn.String(), opsLogEntry)
-                if err != nil {
-                    return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough nodes")
-                }
-            }
-        }
-    }
+		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
+		if err != nil {
+			return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+		}
+		for i := range vnodes {
+			if vnodes[i] != nil {
+				_, _, _, _, err := lm.Ring.Transport().WLock(vnodes[i], key, version, timeout, lm.Vn.String(), opsLogEntry)
+				if err != nil {
+					return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough nodes")
+				}
+			}
+		}
+	}
 
-    lm.OpsLog = append(lm.OpsLog, opsLogEntry) // TODO : Sort it from the last
-    lm.opsLogMut.Unlock()
-    return lockID, version, timeout, lm.CommitPoint, nil
+	lm.OpsLog = append(lm.OpsLog, opsLogEntry) // TODO : Sort it from the last
+	lm.opsLogMut.Unlock()
+	return lockID, version, timeout, lm.CommitPoint, nil
 }
 
 func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
-    present, ver, err := lm.checkWLock(key)
-    if err != nil {
-        return fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
-    }
-    if !present {
-        return fmt.Errorf("Lock not available. Cannot commit")
-    }
-    if ver != version {
-        return fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
-    }
+	present, ver, err := lm.checkWLock(key)
+	if err != nil {
+		return fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
+	}
+	if !present {
+		return fmt.Errorf("Lock not available. Cannot commit")
+	}
+	if ver != version {
+		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
+	}
 
-    lm.verMapMut.Lock()
-    /*TODO Wait until the backup LMs also perform the same operation and then commit it */
-    if lm.VersionMap == nil {
-        lm.VersionMap = make(map[string]uint)
-    }
-    lm.VersionMap[key] = version
-    lm.verMapMut.Unlock()
-    lm.wLockMut.Lock()
-    defer lm.wLockMut.Unlock()
+	lm.verMapMut.Lock()
+	/*TODO Wait until the backup LMs also perform the same operation and then commit it */
+	if lm.VersionMap == nil {
+		lm.VersionMap = make(map[string]uint)
+	}
+	lm.VersionMap[key] = version
+	lm.verMapMut.Unlock()
+	lm.wLockMut.Lock()
+	defer lm.wLockMut.Unlock()
 	lm.opsLogMut.Lock()
 	lm.currOpNum++
 	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "COMMIT", Key: key, Version: version, Timeout: nil}
