@@ -62,13 +62,13 @@ func TestTrackerJoinTimeout(t *testing.T) {
 	vnode1 := &Vnode{Host: "localnode1:1234", Id: []byte("vnode1")}
 	vnode2 := &Vnode{Host: "localnode2:3456", Id: []byte("vnode2")}
 
-	existing, err := tr.(*TrackerImpl).handleJoinRingWithTimeout(ringId, vnode1, 1*time.Second)
+	existing, err := tr.(*TrackerImpl).handleJoinRingWithTimeout(ringId, vnode1, 500*time.Millisecond)
 	assert.NoError(t, err)
 	assert.Empty(t, existing)
 
 	// TODO: Ideally, we'll be using some kind of a fake clock to do this.
 	// Time pressure :\
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(750 * time.Millisecond)
 
 	existing, err = tr.handleJoinRing(ringId, vnode2)
 	assert.NoError(t, err)
