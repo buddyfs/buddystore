@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var TEST_VALUE = []byte("FOOBAR")
@@ -58,7 +59,7 @@ func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithNodeErrors(t *testing.T) {
+func TestKVGetExistingKeyWithAllNodeReadsFailing(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -67,10 +68,34 @@ func TestKVGetExistingKeyWithNodeErrors(t *testing.T) {
 	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
 	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
+	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 
 	v, err := kvsClient.Get(TEST_KEY)
 	assert.Nil(t, v)
 	assert.Error(t, err, "Could not read data")
+
+	tr.AssertExpectations(t)
+	r.AssertExpectations(t)
+	lm.AssertExpectations(t)
+}
+
+func TestKVGetExistingKeyWithSomeNodeReadsFailing(t *testing.T) {
+	tr, r, lm, kvsClient := CreateKVClientWithMocks()
+
+	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
+	vnode2 := &Vnode{Id: []byte("123456"), Host: "vnode2"}
+
+	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
+	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
+
+	// TODO: Ideally this would check that the vnode being called
+	// is either vnode1 or vnode2.
+	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
+	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
+
+	v, err := kvsClient.Get(TEST_KEY)
+	assert.Equal(t, TEST_VALUE, v)
+	assert.Nil(t, err)
 
 	tr.AssertExpectations(t)
 	r.AssertExpectations(t)
@@ -85,7 +110,10 @@ func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
 
 	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
 	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]*Vnode{vnode1, vnode2}, nil).Once()
-	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
+
+	// TODO: Ideally this would check that the vnode being called
+	// is either vnode1 or vnode2.
+	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
 
 	v, err := kvsClient.Get(TEST_KEY)
 	assert.Equal(t, TEST_VALUE, v)
