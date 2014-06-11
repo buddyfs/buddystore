@@ -215,6 +215,8 @@ func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 		// Verify that the socket is valid. Might be closed.
 		if _, err := out.sock.Read(nil); err == nil {
 			return out, nil
+		} else {
+			out.sock.Close()
 		}
 	}
 
