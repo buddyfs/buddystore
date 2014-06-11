@@ -23,11 +23,10 @@ const BUDDYSTORE_INFOHASH_BASE = "BuddyStore"
 const PEERLEN = 6
 
 type BuddyStore struct {
-	Config       *BuddyStoreConfig
-	GlobalRing   RingIntf
-	SubRings     map[string]RingIntf
-	LockManagers map[string]LMClientIntf
-	Tracker      TrackerClient
+	Config     *BuddyStoreConfig
+	GlobalRing RingIntf
+	SubRings   map[string]RingIntf
+	Tracker    TrackerClient
 
 	initalized bool
 	lock       sync.Mutex
@@ -44,7 +43,6 @@ type BuddyStoreConfig struct {
  */
 func (bs *BuddyStore) addRing(ringId string, ring RingIntf) {
 	bs.SubRings[ringId] = ring
-	bs.LockManagers[ringId] = &LManagerClient{Ring: ring, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 }
 
 /*
@@ -106,14 +104,18 @@ func (bs *BuddyStore) init() error {
 				continue
 			}
 
-			glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
+			if glog.V(2) {
+				glog.Infof("Trying to contact peer: %q, me: %d", peer, port)
+			}
 			bs.GlobalRing, err = Join(conf, transport, peer)
 
 			if err == nil {
 				glog.Infof("Successfully joined chord ring using peer %s", peer)
 				break
 			} else {
-				glog.Infof("Failed to contact peer with error: %s", err)
+				if glog.V(2) {
+					glog.Infof("Failed to contact peer with error: %s", err)
+				}
 			}
 
 			bs.GlobalRing = nil
@@ -169,7 +171,7 @@ func (bs BuddyStore) GetKVClient(ringId string) (KVStoreClient, int) {
 	}
 
 	ring := bs.SubRings[ringId]
-	lm := bs.LockManagers[ringId]
+	lm := ring.GetLocalLocalVnode().lm_client
 
 	kvClient := NewKVStoreClientWithLM(ring, lm)
 	return kvClient, OK
@@ -181,7 +183,7 @@ func NewBuddyStore(bsConfig *BuddyStoreConfig) *BuddyStore {
 		return nil
 	}
 
-	bs := &BuddyStore{Config: bsConfig, lock: sync.Mutex{}, SubRings: make(map[string]RingIntf), LockManagers: make(map[string]LMClientIntf)}
+	bs := &BuddyStore{Config: bsConfig, lock: sync.Mutex{}, SubRings: make(map[string]RingIntf)}
 	err := bs.init()
 
 	if err != nil {

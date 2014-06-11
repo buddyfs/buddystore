@@ -128,9 +128,11 @@ func printLogs(opsLog []*OpsLogEntry) {
 
 func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 	upnpclient, _, err := internetgateway1.NewWANIPConnection1Clients()
-	if err == nil {
+	if err == nil && len(upnpclient) > 0 {
 		externalAddr, err = upnpclient[0].GetExternalIPAddress()
 		glog.Infof("External IP: %s, err: %s", externalAddr, err)
+	} else {
+		glog.Infof("No external IP")
 	}
 
 	ifaces, err := net.Interfaces()
@@ -140,9 +142,12 @@ func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 				continue
 			}
 			addrs, _ := iface.Addrs()
-			glog.Infof("Address: %s", addrs[0].(*net.IPNet).IP.String())
-			localAddr = addrs[0].(*net.IPNet).IP.String()
-			return
+
+			if len(addrs) > 0 {
+				glog.Infof("Local Address: %s", addrs[0].(*net.IPNet).IP.String())
+				localAddr = addrs[0].(*net.IPNet).IP.String()
+				return
+			}
 		}
 	}
 
@@ -168,7 +173,7 @@ func CreateNewTCPTransport() (int, Transport, *Config) {
 	upnpclient, errs, err := internetgateway1.NewWANIPConnection1Clients()
 	glog.Infof("Client: %q, errors: %q, error: %q", upnpclient, errs, err)
 
-	if err == nil {
+	if err == nil && len(upnpclient) > 0 {
 		err = upnpclient[0].AddPortMapping("", uint16(port), "TCP", uint16(port), localAddr, true, "BuddyStore", 0)
 		glog.Infof("Added port mapping: %s", err)
 	}

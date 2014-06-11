@@ -46,6 +46,10 @@ func (m MockRing) GetLocalVnode() *Vnode {
 	panic("TODO: MockRing.GetLocalVnode")
 }
 
+func (m MockRing) GetLocalLocalVnode() *localVnode {
+	panic("TODO: MockRing.GetLocalVnode")
+}
+
 func (m MockRing) GetRingId() string {
 	panic("TODO: MockRing.GetRingId")
 }

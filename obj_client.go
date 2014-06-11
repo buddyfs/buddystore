@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/golang/glog"
 )
@@ -65,11 +66,24 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("No Successors found")
 	}
 
-	// TODO: Choose a random successor instead of the first one.
-	value, err := kv.ring.Transport().Get(succVnodes[0], key, v)
+	// TODO: Performance optimization:
+	// Make parallel calls and take the fastest successful response.
+	for len(succVnodes) > 0 {
+		// Pick a random node in the list of possible replicas
+		randval := rand.Intn(len(succVnodes))
+		node := succVnodes[randval]
+		succVnodes = append(succVnodes[:randval], succVnodes[randval+1:]...)
 
-	// TODO: Should we retry this call if there is an error?
-	return value, err
+		// Perform read operation on the random node
+		value, err := kv.ring.Transport().Get(node, key, v)
+
+		// If operation failed, try another node
+		if err == nil {
+			return value, err
+		}
+	}
+
+	return nil, fmt.Errorf("All read replicas failed")
 }
 
 /*

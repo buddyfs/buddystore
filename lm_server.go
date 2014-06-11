@@ -221,6 +221,9 @@ We will pass nodeID for all the operations
 func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID string, opsLogInEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 
 	if !lm.CurrentLM {
+		if opsLogInEntry == nil {
+			return "", 0, 0, 0, fmt.Errorf("500: Reached the non-Primary Lock Manager")
+		}
 		fmt.Println("Replica got a copy from primary with log ", opsLogInEntry)
 		// Backup node - Log and return
 		lm.opsLogMut.Lock()

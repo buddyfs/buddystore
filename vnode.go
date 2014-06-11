@@ -347,8 +347,10 @@ func (vn *localVnode) updatePredecessorList() error {
 // Finds next N successors. N must be <= NumSuccessors
 func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 	// Check if we are the immediate predecessor
-	if betweenRightIncl(vn.Id, vn.successors[0].Id, key) {
-		return vn.successors[:n], nil
+	if vn.successors[0] != nil {
+		if betweenRightIncl(vn.Id, vn.successors[0].Id, key) {
+			return vn.successors[:n], nil
+		}
 	}
 
 	// Try the closest preceeding nodes

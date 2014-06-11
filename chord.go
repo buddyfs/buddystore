@@ -181,6 +181,7 @@ type RingIntf interface {
 	Transport() Transport
 	GetNumSuccessors() int
 	GetLocalVnode() *Vnode
+	GetLocalLocalVnode() *localVnode
 	GetRingId() string
 	GetHashFunc() func() hash.Hash
 }
@@ -336,10 +337,14 @@ func (r *Ring) GetRingId() string {
 	return r.config.RingId
 }
 
+func (r *Ring) GetLocalLocalVnode() *localVnode {
+	return r.vnodes[0]
+}
+
 func (r *Ring) GetLocalVnode() *Vnode {
 	// TODO: Questionable code
 	// Is vnodes[0] always going to be a local node?
-	return &r.vnodes[0].Vnode
+	return &r.GetLocalLocalVnode().Vnode
 }
 
 func (r *Ring) GetHashFunc() func() hash.Hash {

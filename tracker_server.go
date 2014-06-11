@@ -82,15 +82,20 @@ type TrackerImpl struct {
 	ringMembers  map[string][]*Vnode
 	lock         sync.Mutex
 	timer        *time.Timer
+	clock        ClockIface
 
 	// Implements:
 	Tracker
 }
 
-func NewTracker() Tracker {
+func NewTrackerWithClock(clock ClockIface) Tracker {
 	pq := &TimeoutQueue{}
 	heap.Init(pq)
-	return &TrackerImpl{lock: sync.Mutex{}, ringMembers: make(map[string][]*Vnode), timeoutQueue: pq}
+	return &TrackerImpl{lock: sync.Mutex{}, ringMembers: make(map[string][]*Vnode), timeoutQueue: pq, clock: clock}
+}
+
+func NewTracker() Tracker {
+	return NewTrackerWithClock(new(RealClock))
 }
 
 func (tr *TrackerImpl) handleTimer() {
@@ -105,7 +110,7 @@ func (tr *TrackerImpl) handleTimer() {
 	}
 
 	nextTimer := head.priority
-	now := time.Now()
+	now := tr.clock.Now()
 
 	if now.After(nextTimer) {
 		stale := tr.timeoutQueue.Pop()
@@ -137,8 +142,8 @@ func (tr *TrackerImpl) rescheduleTimer() {
 
 	nextTimer := head.priority
 
-	timeToNextTimer := nextTimer.Sub(time.Now())
-	tr.timer = time.AfterFunc(timeToNextTimer, func() {
+	timeToNextTimer := nextTimer.Sub(tr.clock.Now())
+	tr.timer = tr.clock.AfterFunc(timeToNextTimer, func() {
 		tr.handleTimer()
 	})
 }
@@ -147,7 +152,7 @@ func (tr *TrackerImpl) handleJoinRingWithTimeout(ringId string, joiner *Vnode, t
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 
-	now := time.Now()
+	now := tr.clock.Now()
 	if glog.V(2) {
 		glog.Infof("Node %s joining ring %s at %d", joiner, ringId, now)
 	}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestTrackerHandleJoin(t *testing.T) {
@@ -58,17 +59,18 @@ func TestTrackerHandleReJoin(t *testing.T) {
 
 func TestTrackerJoinTimeout(t *testing.T) {
 	ringId := "ring1"
-	tr := NewTracker()
+	c := NewFrozenClock()
+	tr := NewTrackerWithClock(c)
 	vnode1 := &Vnode{Host: "localnode1:1234", Id: []byte("vnode1")}
 	vnode2 := &Vnode{Host: "localnode2:3456", Id: []byte("vnode2")}
 
-	existing, err := tr.(*TrackerImpl).handleJoinRingWithTimeout(ringId, vnode1, 1*time.Second)
+	c.On("AfterFunc", mock.Anything, mock.Anything).Return(nil)
+
+	existing, err := tr.(*TrackerImpl).handleJoinRing(ringId, vnode1)
 	assert.NoError(t, err)
 	assert.Empty(t, existing)
 
-	// TODO: Ideally, we'll be using some kind of a fake clock to do this.
-	// Time pressure :\
-	time.Sleep(1 * time.Second)
+	c.Advance(650 * time.Second)
 
 	existing, err = tr.handleJoinRing(ringId, vnode2)
 	assert.NoError(t, err)
