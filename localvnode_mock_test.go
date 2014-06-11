@@ -37,7 +37,10 @@ func (mlv *MockLocalVnode) localVnodeId() []byte {
 }
 
 func (mlv *MockLocalVnode) GetVnode() *Vnode {
-	panic("")
+	args := mlv.Mock.Called()
+	res, _ := args.Get(0).(*Vnode)
+
+	return res
 }
 
 var _ localVnodeIface = new(MockLocalVnode)

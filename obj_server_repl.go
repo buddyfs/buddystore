@@ -172,10 +172,10 @@ func (kvs *KVStore) sendSyncKeys(target *Vnode, key string, wg *sync.WaitGroup, 
 		ver = append(ver, i.Value.(*KVStoreValue).Ver)
 	}
 
-	_, ok := kvs.vn.Ring().Transport().(*LocalTransport).get(target)
+	ok := kvs.vn.Ring().Transport().IsLocalVnode(target)
 
 	if !ok {
-		kvs.vn.Ring().Transport().(*LocalTransport).remote.SyncKeys(target, kvs.vn.GetVnode(), key, ver)
+		kvs.vn.Ring().Transport().SyncKeys(target, kvs.vn.GetVnode(), key, ver)
 	}
 
 	tokens <- true
