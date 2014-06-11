@@ -33,8 +33,9 @@ type BuddyStore struct {
 }
 
 type BuddyStoreConfig struct {
-	MyID    string
-	Friends []string
+	MyID      string
+	Friends   []string
+	LocalOnly bool
 }
 
 /*
@@ -56,7 +57,7 @@ func (bs *BuddyStore) init() error {
 		return fmt.Errorf("Attempting to initialize an already initialized store")
 	}
 
-	port, transport, conf := CreateNewTCPTransport()
+	port, transport, conf := CreateNewTCPTransport(bs.Config.LocalOnly)
 
 	var err error
 
@@ -134,7 +135,7 @@ func (bs *BuddyStore) init() error {
 	bs.Tracker = NewTrackerClient(bs.GlobalRing)
 
 	// Join my own ring
-	ring, err := bs.Tracker.JoinRing(bs.Config.MyID, bs.GlobalRing.GetLocalVnode())
+	ring, err := bs.Tracker.JoinRing(bs.Config.MyID, bs.Config.LocalOnly)
 	if err != nil {
 		// If I'm not able to join my own ring, bail
 		return err
@@ -147,7 +148,7 @@ func (bs *BuddyStore) init() error {
 
 	// Join my friends' rings
 	for _, friend := range bs.Config.Friends {
-		ring, err := bs.Tracker.JoinRing(friend, bs.GlobalRing.GetLocalVnode())
+		ring, err := bs.Tracker.JoinRing(friend, bs.Config.LocalOnly)
 
 		if err != nil {
 			bs.addRing(friend, ring)
