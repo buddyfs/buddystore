@@ -85,11 +85,6 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 
 	kvsClient := NewKVStoreClient(r2)
 
-	// TODO: Workaround to allow Join to stabilize before
-	// lock manager is looked up. This is to make sure both WLock,
-	// CommitWLock and RLock are sent to the same lock manager.
-	time.Sleep(50 * time.Millisecond)
-
 	bar := []byte("bar")
 
 	err = kvsClient.Set(TEST_KEY, bar)

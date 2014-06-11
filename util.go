@@ -157,17 +157,19 @@ func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 func CreateNewTCPTransport(localOnly bool) (int, Transport, *Config) {
 	var localAddr, externalAddr string
 
-	port := int(rand.Uint32()%(64512) + 1024)
-	glog.Infof("PORT: %d", port)
+	var transport Transport
+	var err error = fmt.Errorf("Dummy error")
+	var port int
+	var listen string
 
-	listen := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
-	glog.Infof("Listen Address: %s", listen)
+	for err != nil {
+		port = int(rand.Uint32()%(64512) + 1024)
+		glog.Infof("PORT: %d", port)
 
-	transport, err := InitTCPTransport(listen, LISTEN_TIMEOUT)
-	if err != nil {
-		// TODO: What if transport fails?
-		// Most likely cause: listen port conflict
-		panic("TODO: Is another process listening on this port?")
+		listen = net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
+		glog.Infof("Listen Address: %s", listen)
+
+		transport, err = InitTCPTransport(listen, LISTEN_TIMEOUT)
 	}
 
 	if !localOnly {
