@@ -28,13 +28,6 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, self *Vnode) (*Ring, error)
 		return nil, fmt.Errorf("Unable to get any successors while trying to join ring")
 	}
 
-	/*
-		glog.Infof("Successors: %q", trackerNodes)
-		glog.Infof("RingId: %q", ringId)
-		glog.Infof("Self: %q", self)
-		glog.Infof("Transport: %q", tr.ring.Transport())
-	*/
-
 	_, transport, conf := CreateNewTCPTransport()
 
 	vnodes, err := tr.ring.Transport().JoinRing(trackerNodes[0], ringId, self)
