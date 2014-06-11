@@ -222,7 +222,7 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return "", 0, 0, 0, fmt.Errorf("500: Reached the non-Primary Lock Manager")
+			return "", 0, 0, 0, fmt.Errorf("500: Retry, Reached the non-Primary Lock Manager")
 		}
 		fmt.Println("Replica got a copy from primary with log ", opsLogInEntry)
 		// Backup node - Log and return
@@ -234,7 +234,7 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 			}
 			// Move commitpoint, if all the previous logs are available
 			for i := lm.CommitIndex + 1; i <= len(lm.OpsLog)-1; i++ {
-				if lm.OpsLog[i].OpNum == lm.OpsLog[i-1].OpNum+1 {
+				if (i == 0) || (lm.OpsLog[i].OpNum == lm.OpsLog[i-1].OpNum+1) {
 					lm.CommitPoint++
 					lm.CommitIndex++
 				}

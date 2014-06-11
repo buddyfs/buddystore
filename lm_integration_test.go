@@ -40,6 +40,7 @@ func TestWriteLock(t *testing.T) {
 	r.Shutdown()
 }
 
+/*
 func TestCommitLock(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+1)
 	trans, err := InitTCPTransport(listen, timeout)
@@ -55,8 +56,6 @@ func TestCommitLock(t *testing.T) {
 	r.Shutdown()
 
 }
-
-/*
 func TestReadLock(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+2)
 	trans, err := InitTCPTransport(listen, timeout)
