@@ -72,7 +72,7 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 		return 0, err
 	}
 	/* TODO : Discuss : Extract nodeID and send it to server side. Where to get that info*/
-	retLockID, ver, err := lm.Ring.Transport().RLock(LMVnodes[0], key, lm.Ring.GetLocalVnode().String())
+	retLockID, ver, _, err := lm.Ring.Transport().RLock(LMVnodes[0], key, lm.Ring.GetLocalVnode().String(), nil)
 	if err != nil {
 		return 0, fmt.Errorf("Cannot get ReadLock due to ", err)
 	}
@@ -109,7 +109,7 @@ func (lm *LManagerClient) CommitWLock(key string, version uint) error {
 		return err
 	}
 
-	err = lm.Ring.Transport().CommitWLock(LMVnodes[0], key, version, lm.Ring.GetLocalVnode().String())
+	_, err = lm.Ring.Transport().CommitWLock(LMVnodes[0], key, version, lm.Ring.GetLocalVnode().String(), nil)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (lm *LManagerClient) AbortWLock(key string, version uint) error {
 		return err
 	}
 
-	err = lm.Ring.Transport().AbortWLock(LMVnodes[0], key, version, lm.Ring.GetLocalVnode().String())
+	_, err = lm.Ring.Transport().AbortWLock(LMVnodes[0], key, version, lm.Ring.GetLocalVnode().String(), nil)
 	if err != nil {
 		return err
 	}

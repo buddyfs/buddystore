@@ -590,18 +590,18 @@ RLock tranasport layer implementation
 Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 */
-func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string) (string, uint, error) {
+func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
 	resp := tcpBodyLMRLockResp{}
 	for k, _ := range t.local {
 		nodeID = k
 		break //  Think of a better way to get the local nodeID
 	}
-	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID, SenderAddr: t.sock.Addr().String()}, &resp)
+	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID, SenderAddr: t.sock.Addr().String(), OpsLogEntryPrimary: opsLogEntry}, &resp)
 
 	if err != nil {
-		return "", 0, resp.Err
+		return "", 0, 0, resp.Err
 	} else {
-		return resp.LockId, resp.Version, nil
+		return resp.LockId, resp.Version, resp.CommitPoint, nil
 	}
 }
 
@@ -630,15 +630,15 @@ Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 Param version : The version of the key to be committed
 */
-func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, nodeID string) error {
+func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
 	resp := tcpBodyLMCommitWLockResp{}
-	body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+	body := tcpBodyLMCommitWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID, OpsLogEntryPrimary: opsLogEntry}
 	err := t.networkCall(target.Host, tcpCommitWLockReq, body, &resp)
 
 	if err != nil {
-		return resp.Err
+		return 0, resp.Err
 	} else {
-		return nil
+		return resp.CommitPoint, nil
 	}
 }
 
@@ -701,15 +701,15 @@ AbortWLock transport layer implementation
 Param Vnode : The destination Vnode i.e. the Lock Manager
 Param key : The key for which the read lock should be obtained
 */
-func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeID string) error {
+func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
 	resp := tcpBodyLMAbortWLockResp{}
-	body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID}
+	body := tcpBodyLMAbortWLockReq{Vn: target, Key: key, Version: version, SenderID: nodeID, OpsLogEntryPrimary: opsLogEntry}
 	err := t.networkCall(target.Host, tcpAbortWLockReq, body, &resp)
 
 	if err != nil {
-		return resp.Err
+		return 0, resp.Err
 	} else {
-		return nil
+		return resp.CommitPoint, nil
 	}
 }
 
@@ -1059,12 +1059,13 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyLMRLockResp{}
 			sendResp = &resp
 			if ok {
-				lockId, version, err :=
-					obj.RLock(body.Key, body.SenderID, body.SenderAddr)
+				lockId, version, cp, err :=
+					obj.RLock(body.Key, body.SenderID, body.SenderAddr, body.OpsLogEntryPrimary)
 
 				resp.Err = err
 				resp.LockId = lockId
 				resp.Version = version
+				resp.CommitPoint = cp
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String())
@@ -1107,8 +1108,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyLMCommitWLockResp{}
 			sendResp = &resp
 			if ok {
-				err :=
-					obj.CommitWLock(body.Key, body.Version, body.SenderID)
+				cp, err := obj.CommitWLock(body.Key, body.Version, body.SenderID, body.OpsLogEntryPrimary)
+				resp.CommitPoint = cp
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
@@ -1127,8 +1128,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyLMAbortWLockResp{}
 			sendResp = &resp
 			if ok {
-				err :=
-					obj.AbortWLock(body.Key, body.Version, body.SenderID)
+				cp, err := obj.AbortWLock(body.Key, body.Version, body.SenderID, body.OpsLogEntryPrimary)
+				resp.CommitPoint = cp
 				resp.Err = err
 			} else {
 				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",

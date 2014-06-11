@@ -180,12 +180,12 @@ func (lt *LocalTransport) Deregister(v *Vnode) {
 	lt.lock.Unlock()
 }
 
-func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string) (string, uint, error) {
+func (lt *LocalTransport) RLock(targetLm *Vnode, key string, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
 	lmVnodeRpc, ok := lt.get(targetLm)
 	if !ok {
-		return lt.remote.RLock(targetLm, key, "") //  Because the transport knows my nodeID better
+		return lt.remote.RLock(targetLm, key, "", opsLogEntry) //  Because the transport knows my nodeID better
 	}
-	return lmVnodeRpc.RLock(key, nodeID, "self") //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
+	return lmVnodeRpc.RLock(key, nodeID, "self", opsLogEntry) //  If its local it means that the sender is in the same physical machine. Possible when two instances of buddystore for same ring are running on same machine.
 }
 
 func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
@@ -196,12 +196,12 @@ func (lt *LocalTransport) WLock(targetLm *Vnode, key string, version uint, timeo
 	return lmVnodeRpc.WLock(key, version, timeout, nodeID, opsLogEntry)
 }
 
-func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
+func (lt *LocalTransport) CommitWLock(targetLm *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
 	lmVnodeRpc, ok := lt.get(targetLm)
 	if !ok {
-		return lt.remote.CommitWLock(targetLm, key, version, nodeID)
+		return lt.remote.CommitWLock(targetLm, key, version, nodeID, opsLogEntry)
 	}
-	return lmVnodeRpc.CommitWLock(key, version, nodeID)
+	return lmVnodeRpc.CommitWLock(key, version, nodeID, opsLogEntry)
 }
 
 func (lt *LocalTransport) InvalidateRLock(targetClient *Vnode, lockID string) error {
@@ -212,12 +212,12 @@ func (lt *LocalTransport) InvalidateRLock(targetClient *Vnode, lockID string) er
 	return lmVnodeRpc.obj.InvalidateRLock(lockID)
 }
 
-func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string) error {
+func (lt *LocalTransport) AbortWLock(targetLm *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
 	lmVnodeRpc, ok := lt.get(targetLm)
 	if !ok {
-		return lt.remote.AbortWLock(targetLm, key, version, nodeID)
+		return lt.remote.AbortWLock(targetLm, key, version, nodeID, opsLogEntry)
 	}
-	return lmVnodeRpc.AbortWLock(key, version, nodeID)
+	return lmVnodeRpc.AbortWLock(key, version, nodeID, opsLogEntry)
 }
 
 func (lt *LocalTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
@@ -347,20 +347,20 @@ func (*BlackholeTransport) SkipSuccessor(target, self *Vnode) error {
 func (*BlackholeTransport) Register(v *Vnode, o VnodeRPC) {
 }
 
-func (*BlackholeTransport) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
-	return "", 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+func (*BlackholeTransport) RLock(v *Vnode, key string, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
+	return "", 0, 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
 func (*BlackholeTransport) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 	return "", 0, 0, 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) CommitWLock(v *Vnode, key string, version uint, nodeID string) error {
-	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+func (*BlackholeTransport) CommitWLock(v *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
-func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID string) error {
-	return fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
+func (*BlackholeTransport) AbortWLock(v *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, fmt.Errorf("Failed to connect! Blackhole : %s", v.String())
 }
 
 func (*BlackholeTransport) Get(v *Vnode, key string, version uint) ([]byte, error) {

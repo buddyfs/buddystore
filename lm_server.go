@@ -30,10 +30,10 @@ type OpsLogEntry struct {
 	Timeout *time.Time // Timeout setting if any. For instance, WLocks have timeouts associated with them. When the primary fails, the second should know when to invalidate that entry
 
 	// For handling replication. Nodes should be able to reconstruct the state using this log
-	NodeSet     []string //  2D array. Maps nodeID and remote address. Used for RLock calls to maintain nodesets
-	LockId      string   //  For RLocks and WLocks, the LockID which the primary LM used should be replicated to the secondaries. Do not generate new LockIDs in the secondary
-	CommitPoint uint64   // Operation number of the last committed operation
-	Vn          *Vnode   //  Identity of the VNode, can be extended to be used for sending out of band signals to the primary.
+	NodeSet     *RLockEntry //  2D array. Maps nodeID and remote address. Used for RLock calls to maintain nodesets
+	LockId      string      //  For RLocks and WLocks, the LockID which the primary LM used should be replicated to the secondaries. Do not generate new LockIDs in the secondary
+	CommitPoint uint64      // Operation number of the last committed operation
+	Vn          *Vnode      //  Identity of the VNode, can be extended to be used for sending out of band signals to the primary.
 }
 
 //  In-memory implementation of LockManager that implements LManagerIntf
@@ -64,11 +64,31 @@ type LManager struct {
 
 /* Should be extensible to be used by any underlying storage implementation */
 type LManagerIntf interface {
-	createRLock(key string, nodeID string, remoteAddr string) (string, uint, error)
+	createRLock(key string, nodeID string, remoteAddr string, opsLogInEntry *OpsLogEntry) (string, uint, uint64, error)
 	checkWLock(key string) (bool, uint, error)
 	createWLock(key string, version uint, timeout uint, nodeID string, opsLogEntry []*OpsLogEntry) (string, uint, uint, uint64, error)
-	commitWLock(key string, version uint) error
-	abortWLock(key string, version uint) error
+	commitWLock(key string, version uint, opsLogInEntry *OpsLogEntry) (uint64, error)
+	abortWLock(key string, version uint, opsLogInEntry *OpsLogEntry) (uint64, error)
+}
+
+func (lm *LManager) appendToLog(opsLogInEntry *OpsLogEntry) {
+	fmt.Println("Replica got a copy from primary with log ", opsLogInEntry)
+	// Backup node - Log and return
+	lm.opsLogMut.Lock()
+	lm.OpsLog = append(lm.OpsLog, opsLogInEntry)
+	if len(lm.OpsLog) > 1 {
+		for i := len(lm.OpsLog) - 1; lm.OpsLog[i].OpNum < lm.OpsLog[i-1].OpNum; i-- {
+			lm.OpsLog[i].OpNum, lm.OpsLog[i-1].OpNum = lm.OpsLog[i-1].OpNum, lm.OpsLog[i].OpNum
+		}
+		// Move commitpoint, if all the previous logs are available
+		for i := lm.CommitIndex + 1; i <= len(lm.OpsLog)-1; i++ {
+			if (i == 0) || (lm.OpsLog[i].OpNum == lm.OpsLog[i-1].OpNum+1) {
+				lm.CommitPoint++
+				lm.CommitIndex++
+			}
+		}
+	}
+	lm.opsLogMut.Unlock()
 }
 
 /*
@@ -96,7 +116,7 @@ func (lm *LManager) scheduleTimeoutTicker() {
 	}()
 }
 
-/* Regularly check if I am the LockManager */
+/* Logic is moved to stabilize operation in vnode.go */
 func (lm *LManager) ScheduleLMCheckTicker() {
 	lm.LMCheckTicker = time.NewTicker(100 * time.Millisecond)
 	quit := make(chan struct{})
@@ -149,21 +169,28 @@ func getLockID() (string, error) {
 }
 
 /*
-On arrival of a RLock request, the RLock is registered in the local machine, there is no requirement for adding it to the log, and then the next two successors of the LM are supposed to do the same operation.
 Once both the secondary nodes get back with a success indication, then the method can reply that the RLock is provided, else it should fail.
 */
-func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
+func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, opsLogInEntry *OpsLogEntry) (string, uint, uint64, error) {
+
+	if !lm.CurrentLM {
+		if opsLogInEntry == nil {
+			return "", 0, 0, fmt.Errorf("500: Retry, RLock request reached the non-Primary Lock Manager")
+		}
+		lm.appendToLog(opsLogInEntry)
+		return opsLogInEntry.LockId, opsLogInEntry.Version, lm.CommitPoint, nil
+	}
 
 	lm.verMapMut.Lock()
 	version := lm.VersionMap[key]
 	lm.verMapMut.Unlock()
 	if version == 0 {
-		return "", 0, fmt.Errorf("ReadLock not possible. Key not present in LM")
+		return "", 0, lm.CommitPoint, fmt.Errorf("ReadLock not possible. Key not present in LM")
 	}
 
 	lockID, err := getLockID()
 	if err != nil {
-		return "", 0, err
+		return "", 0, lm.CommitPoint, err
 	}
 
 	lm.rLockMut.Lock()
@@ -181,26 +208,32 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string) (s
 		rLockEntry.nodeSet = make(map[string][]string)
 	}
 
+	rLockEntry.nodeSet[nodeID] = make([]string, 2)
+	rLockEntry.nodeSet[nodeID][0] = lockID     // Added the nodeID to the nodeSet for the given key
+	rLockEntry.nodeSet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
+	lm.rLockMut.Unlock()
+
+	lm.opsLogMut.Lock()
+	defer lm.opsLogMut.Unlock()
+	lm.currOpNum++
+	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "READ", Key: key, NodeSet: lm.RLocks[key], LockId: lockID, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
+	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
+
 	// If current Lock Manager, replicate to next two nodes
 	if lm.CurrentLM {
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
-			return "", 0, fmt.Errorf("Retry Later. Expected : Atleast 2 successors to the LockManager, but only ", len(vnodes), " are available")
+			return "", 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast 2 successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
-			_, _, err := lm.Ring.Transport().RLock(vnodes[i], key, lm.Vn.String())
+			_, _, _, err := lm.Ring.Transport().RLock(vnodes[i], key, lm.Vn.String(), opsLogEntry)
 			if err != nil {
-				return "", 0, fmt.Errorf("Retry : Cannot replicate operation to enough replica")
+				return "", 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough replica")
 			}
 		}
 	}
 
-	rLockEntry.nodeSet[nodeID] = make([]string, 2)
-	rLockEntry.nodeSet[nodeID][0] = lockID     // Added the nodeID to the nodeSet for the given key
-	rLockEntry.nodeSet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
-
-	lm.rLockMut.Unlock()
-	return lockID, version, nil
+	return lockID, version, lm.CommitPoint, nil
 }
 
 func (lm *LManager) checkWLock(key string) (bool, uint, error) {
@@ -222,25 +255,9 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return "", 0, 0, 0, fmt.Errorf("500: Retry, Reached the non-Primary Lock Manager")
+			return "", 0, 0, 0, fmt.Errorf("500: Retry, WLock request reached the non-Primary Lock Manager")
 		}
-		fmt.Println("Replica got a copy from primary with log ", opsLogInEntry)
-		// Backup node - Log and return
-		lm.opsLogMut.Lock()
-		lm.OpsLog = append(lm.OpsLog, opsLogInEntry)
-		if len(lm.OpsLog) > 1 {
-			for i := len(lm.OpsLog) - 1; lm.OpsLog[i].OpNum < lm.OpsLog[i-1].OpNum; i-- {
-				lm.OpsLog[i].OpNum, lm.OpsLog[i-1].OpNum = lm.OpsLog[i-1].OpNum, lm.OpsLog[i].OpNum
-			}
-			// Move commitpoint, if all the previous logs are available
-			for i := lm.CommitIndex + 1; i <= len(lm.OpsLog)-1; i++ {
-				if (i == 0) || (lm.OpsLog[i].OpNum == lm.OpsLog[i-1].OpNum+1) {
-					lm.CommitPoint++
-					lm.CommitIndex++
-				}
-			}
-		}
-		lm.opsLogMut.Unlock()
+		lm.appendToLog(opsLogInEntry)
 		return opsLogInEntry.LockId, version, timeout, lm.CommitPoint, nil
 	}
 
@@ -284,41 +301,52 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 	t := time.Now().UTC()
 	t = t.Add(time.Duration(timeout) * time.Second)
 	lm.opsLogMut.Lock()
+	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
-	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "WRITE", Key: key, Version: version, Timeout: &t, NodeSet: nil, LockId: lockID, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
-	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: &t}
+	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "WRITE", Key: key, Version: version, Timeout: &t, LockId: lockID, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
+	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 
 	// If current LockManager, replicate the operation to the next two nodes
 	if lm.CurrentLM {
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
+			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
 			return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
 			if vnodes[i] != nil {
 				_, _, _, _, err := lm.Ring.Transport().WLock(vnodes[i], key, version, timeout, lm.Vn.String(), opsLogEntry)
 				if err != nil {
+					lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
 					return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough nodes")
 				}
 			}
 		}
 	}
 
-	lm.OpsLog = append(lm.OpsLog, opsLogEntry) // TODO : Sort it from the last
-	lm.opsLogMut.Unlock()
+	lm.WLocks[key] = &WLockEntry{nodeID: nodeID, LockID: lockID, version: version, timeout: &t}
 	return lockID, version, timeout, lm.CommitPoint, nil
 }
 
-func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
+func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogInEntry *OpsLogEntry) (uint64, error) {
+
+	if !lm.CurrentLM {
+		if opsLogInEntry == nil {
+			return lm.CommitPoint, fmt.Errorf("500: Retry, Commit WLock request reached the non-Primary Lock Manager")
+		}
+		lm.appendToLog(opsLogInEntry)
+		return lm.CommitPoint, nil
+	}
+
 	present, ver, err := lm.checkWLock(key)
 	if err != nil {
-		return fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
+		return lm.CommitPoint, fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
 	}
 	if !present {
-		return fmt.Errorf("Lock not available. Cannot commit")
+		return lm.CommitPoint, fmt.Errorf("Lock not available. Cannot commit")
 	}
 	if ver != version {
-		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
+		return lm.CommitPoint, fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
 	}
 
 	lm.verMapMut.Lock()
@@ -328,29 +356,31 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 	}
 	lm.VersionMap[key] = version
 	lm.verMapMut.Unlock()
-	lm.wLockMut.Lock()
-	defer lm.wLockMut.Unlock()
 	lm.opsLogMut.Lock()
+	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
-	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "COMMIT", Key: key, Version: version, Timeout: nil}
+	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "COMMIT", Key: key, Version: version, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
+	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 
 	// If current LockManager, replicate operation on the next NUM_LM_REPLICA nodes
 	if lm.CurrentLM {
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
-			return fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
+			return lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
-			err := lm.Ring.Transport().CommitWLock(vnodes[i], key, version, lm.Vn.String())
+			_, err := lm.Ring.Transport().CommitWLock(vnodes[i], key, version, lm.Vn.String(), opsLogEntry)
 			if err != nil {
-				return fmt.Errorf("Retry : Operation couldn't be replicated to enough nodes")
+				lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
+				return lm.CommitPoint, fmt.Errorf("Retry : Operation couldn't be replicated to enough nodes. Got error :  %q", err)
 			}
 		}
 	}
 
-	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
+	lm.wLockMut.Lock()
 	delete(lm.WLocks, key)
-	lm.opsLogMut.Unlock()
+	lm.wLockMut.Unlock()
 
 	/* The Read cache invalidation should happen only after the result is returned to the client. Consistency */
 	defer func() {
@@ -370,44 +400,55 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string) error {
 		delete(lm.RLocks, key)
 		lm.rLockMut.Unlock()
 	}()
-	return nil
+	return lm.CommitPoint, nil
 }
 
 /* TODO : Minor : Fix this : We do not need the nodeID */
-func (lm *LManager) abortWLock(key string, version uint, nodeID string) error {
+func (lm *LManager) abortWLock(key string, version uint, nodeID string, opsLogInEntry *OpsLogEntry) (uint64, error) {
+
+	if !lm.CurrentLM {
+		if opsLogInEntry == nil {
+			return lm.CommitPoint, fmt.Errorf("500: Retry, Abort WLock request reached the non-Primary Lock Manager")
+		}
+		lm.appendToLog(opsLogInEntry)
+		return lm.CommitPoint, nil
+	}
+
 	present, ver, err := lm.checkWLock(key)
 	if err != nil {
-		return fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
+		return lm.CommitPoint, fmt.Errorf("Error while looking up the existing set of write locks in Lock Manager")
 	}
 	if !present {
-		return fmt.Errorf("Lock not available. Nothing to abort")
+		return lm.CommitPoint, fmt.Errorf("Lock not available. Nothing to abort")
 	}
 	if ver != version {
-		return fmt.Errorf("Requested version doesn't match with the version locked. Cannot abort")
+		return lm.CommitPoint, fmt.Errorf("Requested version doesn't match with the version locked. Cannot abort")
 	}
 
 	lm.opsLogMut.Lock()
+	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
-	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "ABORT", Key: key, Version: version, Timeout: nil}
+	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "ABORT", Key: key, Version: version, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
+	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 
 	// If Current LockManager then replicate operation to the next NUM_LM_REPLICA nodes
 	if lm.CurrentLM {
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
-			return fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
+			return lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
-			err := lm.Ring.Transport().AbortWLock(vnodes[i], key, version, lm.Vn.String())
+			_, err := lm.Ring.Transport().AbortWLock(vnodes[i], key, version, lm.Vn.String(), opsLogEntry)
 			if err != nil {
-				return fmt.Errorf("Retry : Operation couldn't be replicated to enough replica")
+				lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
+				return lm.CommitPoint, fmt.Errorf("Retry : Operation couldn't be replicated to enough replica")
 			}
 		}
 	}
 
-	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 	lm.wLockMut.Lock()
 	delete(lm.WLocks, key)
 	lm.wLockMut.Unlock()
-	lm.opsLogMut.Unlock()
-	return nil
+	return lm.CommitPoint, nil
 }

@@ -43,10 +43,10 @@ type Transport interface {
 	Register(*Vnode, VnodeRPC)
 
 	// Lock Manager operations
-	RLock(*Vnode, string, string) (string, uint, error)
+	RLock(*Vnode, string, string, *OpsLogEntry) (string, uint, uint64, error)
 	WLock(*Vnode, string, uint, uint, string, *OpsLogEntry) (string, uint, uint, uint64, error)
-	CommitWLock(*Vnode, string, uint, string) error
-	AbortWLock(*Vnode, string, uint, string) error
+	CommitWLock(*Vnode, string, uint, string, *OpsLogEntry) (uint64, error)
+	AbortWLock(*Vnode, string, uint, string, *OpsLogEntry) (uint64, error)
 	InvalidateRLock(*Vnode, string) error
 
 	// KV Store operations
@@ -86,10 +86,10 @@ type VnodeRPC interface {
 	PurgeVersions(key string, maxVersion uint) error
 
 	// Lock Manager operations
-	RLock(key string, nodeID string, remoteAddr string) (string, uint, error)
+	RLock(key string, nodeID string, remoteAddr string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error)
 	WLock(key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error)
-	CommitWLock(key string, version uint, nodeID string) error
-	AbortWLock(key string, version uint, nodeID string) error
+	CommitWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error)
+	AbortWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error)
 	InvalidateRLock(lockID string) error
 	CheckWLock(key string) (bool, uint, error)
 

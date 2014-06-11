@@ -69,16 +69,16 @@ func (mv *MockVnodeRPC) PurgeVersions(key string, maxVersion uint) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) RLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
-	return "", 0, nil
+func (mv *MockVnodeRPC) RLock(key string, nodeID string, remoteAddr string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
+	return "", 0, 0, nil
 }
 
 func (mv *MockVnodeRPC) WLock(key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 	return "", 0, 0, 0, nil
 }
 
-func (mv *MockVnodeRPC) CommitWLock(key string, version uint, nodeID string) error {
-	return nil
+func (mv *MockVnodeRPC) CommitWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, nil
 }
 
 func (mv *MockVnodeRPC) CheckWLock(key string) (bool, uint, error) {
@@ -93,8 +93,8 @@ func (mv *MockVnodeRPC) InvalidateRLock(lockID string) error {
 	return nil
 }
 
-func (mv *MockVnodeRPC) AbortWLock(key string, version uint, nodeID string) error {
-	return nil
+func (mv *MockVnodeRPC) AbortWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, nil
 }
 
 func (vn *MockVnodeRPC) JoinRing(ringId string, self *Vnode) ([]*Vnode, error) {

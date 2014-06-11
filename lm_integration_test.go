@@ -21,14 +21,12 @@ func TestWriteLock(t *testing.T) {
 
 	var conf *Config = fastConf()
 	conf.NumVnodes = 5
-	conf.StabilizeMin = 50 * time.Millisecond
-	conf.StabilizeMax = 100 * time.Millisecond
 	r, err := Create(conf, trans)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Wait for stabilization
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	version, err := r.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
 	if err != nil {
@@ -40,27 +38,30 @@ func TestWriteLock(t *testing.T) {
 	r.Shutdown()
 }
 
-/*
 func TestCommitLock(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+1)
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
-	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
-	version, err := lm.WLock(TEST_KEY, 1, 10)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
 
-	err = lm.CommitWLock(TEST_KEY, version)
+	version, err := r.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
+	err = r.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
 	if err != nil {
-		t.Fatalf("Error while committing the write locked key")
+		t.Fatalf("Error while committing the write locked key. Got ", err)
 	}
 	r.Shutdown()
 
 }
+
 func TestReadLock(t *testing.T) {
 	var listen string = fmt.Sprintf("localhost:%d", PORT+2)
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, err := lm.WLock(TEST_KEY, 1, 10)
 	err = lm.CommitWLock(TEST_KEY, version)
@@ -80,6 +81,8 @@ func TestAbortLock(t *testing.T) {
 	trans, _ := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, _ := Create(conf, trans)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, _ := lm.WLock(TEST_KEY, 1, 10)
 	_ = lm.CommitWLock(TEST_KEY, version)
@@ -113,6 +116,8 @@ func TestReadLockCached(t *testing.T) {
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, err := lm.WLock(TEST_KEY, 1, 10)
 	err = lm.CommitWLock(TEST_KEY, version)
@@ -138,6 +143,8 @@ func TestUpdateKey(t *testing.T) {
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, err := lm.WLock(TEST_KEY, 1, 10)
 	err = lm.CommitWLock(TEST_KEY, version)
@@ -169,6 +176,9 @@ func TestWLockTimeTicker(t *testing.T) {
 	trans, err := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, err := Create(conf, trans)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
 	lm := &LManagerClient{Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
 	version, err := lm.WLock(TEST_KEY, 0, 2)
 	err = lm.CommitWLock(TEST_KEY, version)
@@ -207,6 +217,9 @@ func TestJoinLockRemote(t *testing.T) {
 	conf := fastConf()
 	conf.Hostname = "localhost:9007" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
 	if err != nil {
 		t.Fatalf("unexpected err. %s", err)
 	}
@@ -215,6 +228,9 @@ func TestJoinLockRemote(t *testing.T) {
 	conf2 := fastConf()
 	conf2.Hostname = "localhost:9008" //  I know where I reside
 	r2, err := Join(conf2, ml2, conf.Hostname)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
@@ -260,6 +276,9 @@ func TestRLockInvalidate(t *testing.T) {
 	conf.NumVnodes = 2
 	conf.Hostname = "localhost:10000" // I know who am going to bootstrap with
 	r, err := Create(conf, ml1)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
 	if err != nil {
 		t.Fatalf("unexpected err. %s", err)
 	}
@@ -268,7 +287,9 @@ func TestRLockInvalidate(t *testing.T) {
 	conf2.NumVnodes = 2
 	conf2.Hostname = "localhost:10001" //  I know where I reside
 	r2, err := Join(conf2, ml2, conf.Hostname)
-	time.Sleep(100 * time.Millisecond)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
@@ -301,7 +322,8 @@ func TestRLockInvalidate(t *testing.T) {
 }
 
 // Check if there is only one lockManager irrespective of the number of members in the ring
-func LMDetector(t *testing.T) {
+/*
+func TestLMDetector(t *testing.T) {
 	<-time.After(100 * time.Millisecond)
 	var numRings uint = 5
 	var i uint
@@ -322,9 +344,10 @@ func LMDetector(t *testing.T) {
 			conf.NumVnodes = 3
 			if i != 0 {
 				r[i], err = Join(conf, ml, "localhost:10020")
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			} else {
 				r[i], err = Create(conf, ml)
+				time.Sleep(50 * time.Millisecond)
 			}
 			if err != nil {
 				t.Fatalf("Error while creating and joining rings : ", err)

@@ -105,21 +105,21 @@ func (ml *MultiLocalTrans) Deregister(host string) {
 	delete(ml.hosts, host)
 }
 
-func (ml *MultiLocalTrans) RLock(v *Vnode, key string, nodeID string) (string, uint, error) {
+func (ml *MultiLocalTrans) RLock(v *Vnode, key string, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
 	//  TODO : Are we going to use this transport. Placeholder
-	return "", 0, fmt.Errorf("RLock in MultiLocalTransport not implemented yet")
+	return "", 0, 0, fmt.Errorf("RLock in MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) WLock(v *Vnode, key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 	return "", 0, 0, 0, fmt.Errorf("WLock in MultiLocalTransport not implemented yet")
 }
 
-func (ml *MultiLocalTrans) CommitWLock(v *Vnode, key string, version uint, nodeID string) error {
-	return fmt.Errorf("CommitWLock in MultiLocalTransport not implemented yet")
+func (ml *MultiLocalTrans) CommitWLock(v *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, fmt.Errorf("CommitWLock in MultiLocalTransport not implemented yet")
 }
 
-func (ml *MultiLocalTrans) AbortWLock(v *Vnode, key string, version uint, nodeID string) error {
-	return fmt.Errorf("MultiLocalTransport not implemented yet")
+func (ml *MultiLocalTrans) AbortWLock(v *Vnode, key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	return 0, fmt.Errorf("MultiLocalTransport not implemented yet")
 }
 
 func (ml *MultiLocalTrans) InvalidateRLock(v *Vnode, lockID string) error {

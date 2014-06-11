@@ -461,10 +461,10 @@ func (vn *localVnode) knownSuccessors() (successors int) {
 /*
 Vnode RPC implementation for localNode
 */
-func (vn *localVnode) RLock(key string, nodeID string, remoteAddr string) (string, uint, error) {
+func (vn *localVnode) RLock(key string, nodeID string, remoteAddr string, opsLogEntry *OpsLogEntry) (string, uint, uint64, error) {
 	//  TODO : Do exactly this on the TCP server implementation using the Vnode vn. Get the LM instance from the localVnode and call createRLock
-	lockID, version, err := vn.lm.createRLock(key, nodeID, remoteAddr)
-	return lockID, version, err
+	lockID, version, commitPoint, err := vn.lm.createRLock(key, nodeID, remoteAddr, opsLogEntry)
+	return lockID, version, commitPoint, err
 }
 
 func (vn *localVnode) WLock(key string, version uint, timeout uint, nodeID string, opsLogEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
@@ -472,9 +472,9 @@ func (vn *localVnode) WLock(key string, version uint, timeout uint, nodeID strin
 	return lockID, version, timeout, cp, err
 }
 
-func (vn *localVnode) CommitWLock(key string, version uint, nodeID string) error {
-	err := vn.lm.commitWLock(key, version, nodeID)
-	return err
+func (vn *localVnode) CommitWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	cp, err := vn.lm.commitWLock(key, version, nodeID, opsLogEntry)
+	return cp, err
 }
 
 func (vn *localVnode) CheckWLock(key string) (bool, uint, error) {
@@ -494,9 +494,9 @@ func (vn *localVnode) InvalidateRLock(lockID string) error {
 	return err
 }
 
-func (vn *localVnode) AbortWLock(key string, version uint, nodeID string) error {
-	err := vn.lm.abortWLock(key, version, nodeID)
-	return err
+func (vn *localVnode) AbortWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
+	cp, err := vn.lm.abortWLock(key, version, nodeID, opsLogEntry)
+	return cp, err
 }
 
 func (vn *localVnode) Get(key string, version uint) ([]byte, error) {

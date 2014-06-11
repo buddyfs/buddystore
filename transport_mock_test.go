@@ -42,7 +42,7 @@ func (mt *MockTransport) Register(*Vnode, VnodeRPC) {
 	panic("Mock method not implemented")
 }
 
-func (mt *MockTransport) RLock(*Vnode, string, string) (string, uint, error) {
+func (mt *MockTransport) RLock(*Vnode, string, string, *OpsLogEntry) (string, uint, uint64, error) {
 	panic("Mock method not implemented")
 }
 
@@ -50,11 +50,11 @@ func (mt *MockTransport) WLock(*Vnode, string, uint, uint, string, *OpsLogEntry)
 	panic("Mock method not implemented")
 }
 
-func (mt *MockTransport) CommitWLock(*Vnode, string, uint, string) error {
+func (mt *MockTransport) CommitWLock(*Vnode, string, uint, string, *OpsLogEntry) (uint64, error) {
 	panic("Mock method not implemented")
 }
 
-func (mt *MockTransport) AbortWLock(*Vnode, string, uint, string) error {
+func (mt *MockTransport) AbortWLock(*Vnode, string, uint, string, *OpsLogEntry) (uint64, error) {
 	panic("Mock method not implemented")
 }
 

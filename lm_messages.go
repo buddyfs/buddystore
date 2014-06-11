@@ -1,15 +1,17 @@
 package buddystore
 
 type tcpBodyLMRLockReq struct {
-	Vn         *Vnode
-	SenderID   string
-	Key        string
-	SenderAddr string
+	Vn                 *Vnode
+	SenderID           string
+	Key                string
+	SenderAddr         string
+	OpsLogEntryPrimary *OpsLogEntry
 }
 
 type tcpBodyLMRLockResp struct {
-	LockId  string
-	Version uint
+	LockId      string
+	Version     uint
+	CommitPoint uint64
 
 	// Extends:
 	tcpResponseImpl
@@ -35,28 +37,32 @@ type tcpBodyLMWLockResp struct {
 }
 
 type tcpBodyLMCommitWLockReq struct {
-	Vn       *Vnode
-	SenderID string
-	Key      string
-	Version  uint
+	Vn                 *Vnode
+	SenderID           string
+	Key                string
+	Version            uint
+	OpsLogEntryPrimary *OpsLogEntry
 }
 
 type tcpBodyLMCommitWLockResp struct {
-	Dummy bool
+	Dummy       bool
+	CommitPoint uint64
 
 	// Extends:
 	tcpResponseImpl
 }
 
 type tcpBodyLMAbortWLockReq struct {
-	Vn       *Vnode
-	SenderID string
-	Key      string
-	Version  uint
+	Vn                 *Vnode
+	SenderID           string
+	Key                string
+	Version            uint
+	OpsLogEntryPrimary *OpsLogEntry
 }
 
 type tcpBodyLMAbortWLockResp struct {
-	Dummy bool
+	Dummy       bool
+	CommitPoint uint64
 
 	// Extends:
 	tcpResponseImpl
