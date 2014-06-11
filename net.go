@@ -618,7 +618,7 @@ func (t *TCPTransport) WLock(target *Vnode, key string, version uint, timeout ui
 	err := t.networkCall(target.Host, tcpWLockReq, tcpBodyLMWLockReq{Vn: target, Key: key, Version: version, Timeout: timeout, SenderID: nodeID, OpsLogEntryPrimary: opsLogEntry}, &resp)
 
 	if err != nil {
-		return "", 0, 0, 0, resp.Err
+		return "", 0, 0, 0, err
 	} else {
 		return resp.LockId, resp.Version, resp.Timeout, resp.CommitPoint, nil
 	}

@@ -30,6 +30,7 @@ func TestKVIntegrationCreateThenGetKey(t *testing.T) {
 	trans, _ := InitTCPTransport(listen, timeout)
 	var conf *Config = fastConf()
 	r, _ := Create(conf, trans)
+	time.Sleep(50 * time.Millisecond)
 
 	kvsClient := NewKVStoreClient(r)
 
@@ -65,7 +66,9 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	// Bootstrap ring
 	conf := fastConf()
 	conf.Hostname = "localhost:9012" // Bootstrap node
+	conf.NumVnodes = 2
 	r, err := Create(conf, ml1)
+	time.Sleep(50 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("unexpected err. %s", err)
 	}
@@ -73,8 +76,9 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	// Second "ring" instance
 	conf2 := fastConf()
 	conf2.Hostname = "localhost:9013"
+	conf2.NumVnodes = 2
 	r2, err := Join(conf2, ml2, conf.Hostname)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
@@ -84,7 +88,7 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	// TODO: Workaround to allow Join to stabilize before
 	// lock manager is looked up. This is to make sure both WLock,
 	// CommitWLock and RLock are sent to the same lock manager.
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	bar := []byte("bar")
 

@@ -3,7 +3,6 @@ package buddystore
 import (
 	"bytes"
 	"crypto/sha1"
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -388,7 +387,6 @@ func TestVnodeNotifyNoPred(t *testing.T) {
 	vn2.successors[1] = s2
 	vn2.successors[2] = s3
 
-	fmt.Println(vn2)
 	succs, err := vn2.Notify(&vn1.Vnode)
 	if err != nil {
 		t.Fatalf("unexpected error! %s", err)

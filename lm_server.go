@@ -18,7 +18,7 @@ type WLockEntry struct {
 }
 
 type RLockEntry struct {
-	nodeSet map[string][]string //  For each key, there will be a list of nodes and corresponding LockIDs given out. Used during invalidation
+	CopySet map[string][]string //  For each key, there will be a list of nodes and corresponding LockIDs given out. Used during invalidation
 }
 
 /* Struct for the Log used for Lock state replication */
@@ -30,7 +30,7 @@ type OpsLogEntry struct {
 	Timeout *time.Time // Timeout setting if any. For instance, WLocks have timeouts associated with them. When the primary fails, the second should know when to invalidate that entry
 
 	// For handling replication. Nodes should be able to reconstruct the state using this log
-	NodeSet     *RLockEntry //  2D array. Maps nodeID and remote address. Used for RLock calls to maintain nodesets
+	CopySet     *RLockEntry //  2D array. Maps nodeID and remote address. Used for RLock calls to maintain copysets
 	LockId      string      //  For RLocks and WLocks, the LockID which the primary LM used should be replicated to the secondaries. Do not generate new LockIDs in the secondary
 	CommitPoint uint64      // Operation number of the last committed operation
 	Vn          *Vnode      //  Identity of the VNode, can be extended to be used for sending out of band signals to the primary.
@@ -44,7 +44,7 @@ type LManager struct {
 	CurrentLM bool   // Boolean flag which says if the node is the current Lock Manager.
 
 	VersionMap map[string]uint        //  key-version mappings. A map of key to the corresponding version
-	RLocks     map[string]*RLockEntry // Will have the nodeSets for whom the RLocks have been provided for a key
+	RLocks     map[string]*RLockEntry // Will have the CopySets for whom the RLocks have been provided for a key
 	WLocks     map[string]*WLockEntry // Will have mapping from key to the metadata to be maintained
 	wLockMut   sync.Mutex             // Lock for synchronizing access to WLocks
 	rLockMut   sync.Mutex             // Lock for synchronizing access to RLocks
@@ -72,7 +72,6 @@ type LManagerIntf interface {
 }
 
 func (lm *LManager) appendToLog(opsLogInEntry *OpsLogEntry) {
-	fmt.Println("Replica got a copy from primary with log ", opsLogInEntry)
 	// Backup node - Log and return
 	lm.opsLogMut.Lock()
 	lm.OpsLog = append(lm.OpsLog, opsLogInEntry)
@@ -173,6 +172,10 @@ Once both the secondary nodes get back with a success indication, then the metho
 */
 func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, opsLogInEntry *OpsLogEntry) (string, uint, uint64, error) {
 
+	if opsLogInEntry != nil && lm.CurrentLM {
+		return "", 0, lm.CommitPoint, nil
+	}
+
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
 			return "", 0, 0, fmt.Errorf("500: Retry, RLock request reached the non-Primary Lock Manager")
@@ -204,19 +207,19 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 	}
 	rLockEntry := lm.RLocks[key]
 
-	if rLockEntry.nodeSet == nil {
-		rLockEntry.nodeSet = make(map[string][]string)
+	if rLockEntry.CopySet == nil {
+		rLockEntry.CopySet = make(map[string][]string)
 	}
 
-	rLockEntry.nodeSet[nodeID] = make([]string, 2)
-	rLockEntry.nodeSet[nodeID][0] = lockID     // Added the nodeID to the nodeSet for the given key
-	rLockEntry.nodeSet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
+	rLockEntry.CopySet[nodeID] = make([]string, 2)
+	rLockEntry.CopySet[nodeID][0] = lockID     // Added the nodeID to the CopySet for the given key
+	rLockEntry.CopySet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
 	lm.rLockMut.Unlock()
 
 	lm.opsLogMut.Lock()
 	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
-	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "READ", Key: key, NodeSet: lm.RLocks[key], LockId: lockID, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
+	opsLogEntry := &OpsLogEntry{OpNum: lm.currOpNum, Op: "READ", Key: key, CopySet: lm.RLocks[key], LockId: lockID, CommitPoint: lm.CommitPoint, Vn: lm.Vn}
 	lm.OpsLog = append(lm.OpsLog, opsLogEntry)
 
 	// If current Lock Manager, replicate to next two nodes
@@ -253,6 +256,10 @@ We will pass nodeID for all the operations
 */
 func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID string, opsLogInEntry *OpsLogEntry) (string, uint, uint, uint64, error) {
 
+	if opsLogInEntry != nil && lm.CurrentLM {
+		return "", 0, 0, lm.CommitPoint, nil
+	}
+
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
 			return "", 0, 0, 0, fmt.Errorf("500: Retry, WLock request reached the non-Primary Lock Manager")
@@ -260,8 +267,6 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 		lm.appendToLog(opsLogInEntry)
 		return opsLogInEntry.LockId, version, timeout, lm.CommitPoint, nil
 	}
-
-	fmt.Println("Primary Lock Manager..")
 
 	lm.wLockMut.Lock()
 	if lm.WLocks == nil {
@@ -321,6 +326,7 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 					return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough nodes")
 				}
 			}
+
 		}
 	}
 
@@ -329,6 +335,10 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 }
 
 func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogInEntry *OpsLogEntry) (uint64, error) {
+
+	if opsLogInEntry != nil && lm.CurrentLM {
+		return lm.CommitPoint, nil
+	}
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
@@ -390,7 +400,7 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 		}
 		lm.rLockMut.Lock()
 		if lm.RLocks[key] != nil {
-			for k, v := range lm.RLocks[key].nodeSet {
+			for k, v := range lm.RLocks[key].CopySet {
 				err := lm.Ring.transport.InvalidateRLock(&Vnode{Id: []byte(k), Host: v[1]}, v[0])
 				if err != nil {
 					// No-op
@@ -405,6 +415,10 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 
 /* TODO : Minor : Fix this : We do not need the nodeID */
 func (lm *LManager) abortWLock(key string, version uint, nodeID string, opsLogInEntry *OpsLogEntry) (uint64, error) {
+
+	if opsLogInEntry != nil && lm.CurrentLM {
+		return lm.CommitPoint, nil
+	}
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {

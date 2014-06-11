@@ -220,12 +220,10 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 			nearestNode := vn.lm.Ring.nearestVnode([]byte(vn.lm.Ring.config.RingId))
 			if nearestNode.successors[0] != nil {
 				if (vn.predecessor == nil && maybe_pred != nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0 {
-					fmt.Println("Triggering LockManager check")
 					LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
 					if err != nil {
 						fmt.Println("Lookup for LockManager failed with error ", err)
 					}
-					fmt.Println("Got the following as the LockManager ", LMVnodes)
 					if vn.String() == LMVnodes[0].String() {
 						if vn.lm.CurrentLM {
 							// No-op
