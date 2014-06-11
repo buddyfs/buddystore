@@ -241,7 +241,9 @@ func Join(conf *Config, trans Transport, existing string) (*Ring, error) {
 		return nil, fmt.Errorf("Remote host has no vnodes!")
 	}
 
-	glog.Infof("Fetched hosts: %s", hosts)
+	if glog.V(2) {
+		glog.Infof("Fetched hosts: %s", hosts)
+	}
 
 	// Create a ring
 	ring := &Ring{}

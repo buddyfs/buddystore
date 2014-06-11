@@ -1,6 +1,10 @@
 package buddystore
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/golang/glog"
+)
 
 type TrackerClient interface {
 	JoinRing(string, bool) (*Ring, error)
@@ -49,7 +53,11 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, localOnly bool) (*Ring, err
 	}
 
 	for _, vnode := range vnodes {
-		ring, err := Join(conf, transport, vnode.String())
+		if glog.V(2) {
+			glog.Infof("[Ring: %s] Connecting to %s", ringId, vnode.Host)
+		}
+
+		ring, err := Join(conf, transport, vnode.Host)
 		if err == nil {
 			return ring, nil
 		}

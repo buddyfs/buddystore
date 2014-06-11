@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"container/heap"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -155,6 +156,10 @@ func (tr *TrackerImpl) handleJoinRingWithTimeout(ringId string, joiner *Vnode, t
 	now := tr.clock.Now()
 	if glog.V(2) {
 		glog.Infof("Node %s joining ring %s at %d", joiner, ringId, now)
+	}
+
+	if len(joiner.Host) == 0 {
+		return nil, fmt.Errorf("Joining node has not provided network information")
 	}
 
 	existingNodes := tr.ringMembers[ringId]
