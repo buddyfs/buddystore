@@ -84,8 +84,21 @@ func (kv KVStoreClientImpl) GetWithoutRetry(key string) ([]byte, error) {
 		return nil, fmt.Errorf("No Successors found")
 	}
 
+	for i, vnode := range succVnodes {
+		if kv.ring.Transport().IsLocalVnode(vnode) {
+			succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
+			value, err := kv.ring.Transport().Get(vnode, key, v)
+
+			// If operation failed, try another node
+			if err == nil {
+				return value, err
+			}
+		}
+	}
+
 	// TODO: Performance optimization:
 	// Make parallel calls and take the fastest successful response.
+
 	for len(succVnodes) > 0 {
 		// Pick a random node in the list of possible replicas
 		randval := rand.Intn(len(succVnodes))
