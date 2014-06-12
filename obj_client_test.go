@@ -27,7 +27,7 @@ func TestKVGetNonExistentKey(t *testing.T) {
 
 	lm.On("RLock", TEST_KEY, false).Return(0, fmt.Errorf("Key not found")).Once()
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Nil(t, v)
 	assert.Error(t, err, "Could not read data")
 
@@ -41,7 +41,7 @@ func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
 	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
 	r.On("Lookup", 2, []byte(TEST_KEY)).Return(nil, fmt.Errorf("Lookup failed")).Once()
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Nil(t, v)
 	assert.Error(t, err, "Could not read data")
 
@@ -51,7 +51,7 @@ func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
 	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
 	r.On("Lookup", 2, []byte(TEST_KEY)).Return([]Vnode{}, nil).Once()
 
-	v, err = kvsClient.Get(TEST_KEY)
+	v, err = kvsClient.Get(TEST_KEY, false)
 	assert.Nil(t, v)
 	assert.Error(t, err, "Could not read data")
 
@@ -70,7 +70,7 @@ func TestKVGetExistingKeyWithAllNodeReadsFailing(t *testing.T) {
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Nil(t, v)
 	assert.Error(t, err, "Could not read data")
 
@@ -93,7 +93,7 @@ func TestKVGetExistingKeyWithSomeNodeReadsFailing(t *testing.T) {
 	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Equal(t, TEST_VALUE, v)
 	assert.Nil(t, err)
 
@@ -115,7 +115,7 @@ func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
 	// is either vnode1 or vnode2.
 	tr.On("Get", mock.AnythingOfType("*buddystore.Vnode"), TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Equal(t, TEST_VALUE, v)
 	assert.Nil(t, err)
 

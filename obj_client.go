@@ -3,12 +3,13 @@ package buddystore
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/golang/glog"
 )
 
 type KVStoreClient interface {
-	Get(key string) ([]byte, error)
+	Get(key string, retry bool) ([]byte, error)
 	Set(key string, val []byte) error
 }
 
@@ -31,11 +32,29 @@ func NewKVStoreClientWithLM(ringIntf RingIntf, lm LMClientIntf) *KVStoreClientIm
 	return &KVStoreClientImpl{ring: ringIntf, lm: lm}
 }
 
+func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
+	var err error = fmt.Errorf("DUMMY")
+	var val []byte
+
+	for err != nil {
+		val, err = kv.GetWithoutRetry(key)
+		if !retry || !isRetryable(err) {
+			return val, err
+		}
+
+		// TODO: Use some kind of backoff mechanism, like in
+		//       https://github.com/cenkalti/backoff
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return val, nil
+}
+
 /*
  * Basic KV store Get operation
  * TODO: Improve Godoc
  */
-func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
+func (kv KVStoreClientImpl) GetWithoutRetry(key string) ([]byte, error) {
 	/*
 	 * Inform the lock manager we're interested in reading the value for key.
 	 * Expected return value: current version number associated with key.
@@ -45,7 +64,6 @@ func (kv KVStoreClientImpl) Get(key string) ([]byte, error) {
 	 */
 	v, err := kv.lm.RLock(key, false)
 
-	// TODO: Inspect error and determine if we can retry the operation.
 	if err != nil {
 		glog.Errorf("Error acquiring RLock in Get(%q): %s", key, err)
 		return nil, err

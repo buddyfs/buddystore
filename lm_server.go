@@ -178,7 +178,7 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return "", 0, 0, fmt.Errorf("500: Retry, RLock request reached the non-Primary Lock Manager")
+			return "", 0, 0, TransientError("500: Retry, RLock request reached the non-Primary Lock Manager")
 		}
 		lm.appendToLog(opsLogInEntry)
 		return opsLogInEntry.LockId, opsLogInEntry.Version, lm.CommitPoint, nil
@@ -226,12 +226,12 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 	if lm.CurrentLM {
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
-			return "", 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast 2 successors to the LockManager, but only ", len(vnodes), " are available")
+			return "", 0, lm.CommitPoint, TransientError("Retry Later. Expected : Atleast 2 successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
 			_, _, _, err := lm.Ring.Transport().RLock(vnodes[i], key, lm.Vn.String(), opsLogEntry)
 			if err != nil {
-				return "", 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough replica")
+				return "", 0, lm.CommitPoint, TransientError("Retry : Cannot replicate operation to enough replica")
 			}
 		}
 	}
@@ -262,7 +262,7 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return "", 0, 0, 0, fmt.Errorf("500: Retry, WLock request reached the non-Primary Lock Manager")
+			return "", 0, 0, 0, TransientError("500: Retry, WLock request reached the non-Primary Lock Manager")
 		}
 		lm.appendToLog(opsLogInEntry)
 		return opsLogInEntry.LockId, version, timeout, lm.CommitPoint, nil
@@ -316,14 +316,14 @@ func (lm *LManager) createWLock(key string, version uint, timeout uint, nodeID s
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
 			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-			return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+			return "", 0, 0, lm.CommitPoint, TransientError("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
 			if vnodes[i] != nil {
 				_, _, _, _, err := lm.Ring.Transport().WLock(vnodes[i], key, version, timeout, lm.Vn.String(), opsLogEntry)
 				if err != nil {
 					lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-					return "", 0, 0, lm.CommitPoint, fmt.Errorf("Retry : Cannot replicate operation to enough nodes")
+					return "", 0, 0, lm.CommitPoint, TransientError("Retry : Cannot replicate operation to enough nodes")
 				}
 			}
 
@@ -342,7 +342,7 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return lm.CommitPoint, fmt.Errorf("500: Retry, Commit WLock request reached the non-Primary Lock Manager")
+			return lm.CommitPoint, TransientError("500: Retry, Commit WLock request reached the non-Primary Lock Manager")
 		}
 		lm.appendToLog(opsLogInEntry)
 		return lm.CommitPoint, nil
@@ -377,13 +377,13 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
 			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-			return lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+			return lm.CommitPoint, TransientError("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
 			_, err := lm.Ring.Transport().CommitWLock(vnodes[i], key, version, lm.Vn.String(), opsLogEntry)
 			if err != nil {
 				lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-				return lm.CommitPoint, fmt.Errorf("Retry : Operation couldn't be replicated to enough nodes. Got error :  %q", err)
+				return lm.CommitPoint, TransientError("Retry : Operation couldn't be replicated to enough nodes. Got error :  %q", err)
 			}
 		}
 	}
@@ -422,7 +422,7 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string, opsLogIn
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return lm.CommitPoint, fmt.Errorf("500: Retry, Abort WLock request reached the non-Primary Lock Manager")
+			return lm.CommitPoint, TransientError("500: Retry, Abort WLock request reached the non-Primary Lock Manager")
 		}
 		lm.appendToLog(opsLogInEntry)
 		return lm.CommitPoint, nil
@@ -450,13 +450,13 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string, opsLogIn
 		vnodes, err := lm.Ring.transport.FindSuccessors(lm.Vn, NUM_LM_REPLICA, []byte(lm.Ring.config.RingId))
 		if err != nil {
 			lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-			return lm.CommitPoint, fmt.Errorf("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
+			return lm.CommitPoint, TransientError("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
 			_, err := lm.Ring.Transport().AbortWLock(vnodes[i], key, version, lm.Vn.String(), opsLogEntry)
 			if err != nil {
 				lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]
-				return lm.CommitPoint, fmt.Errorf("Retry : Operation couldn't be replicated to enough replica")
+				return lm.CommitPoint, TransientError("Retry : Operation couldn't be replicated to enough replica")
 			}
 		}
 	}

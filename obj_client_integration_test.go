@@ -17,7 +17,7 @@ func TestKVIntegrationGetNonExistentKey(t *testing.T) {
 	r, _ := Create(conf, trans)
 
 	kvsClient := NewKVStoreClient(r)
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 
 	assert.Nil(t, v, "Expecting nil value for non-existent key")
 	assert.Error(t, err, "Expecting error while reading non-existent key")
@@ -39,7 +39,7 @@ func TestKVIntegrationCreateThenGetKey(t *testing.T) {
 	err := kvsClient.Set(TEST_KEY, bar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 
 	assert.NoError(t, err, "Expecting no error while reading existing key")
 	assert.Equal(t, v, bar, "Sequential consistency check")
@@ -90,7 +90,7 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	err = kvsClient.Set(TEST_KEY, bar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
 
-	v, err := kvsClient.Get(TEST_KEY)
+	v, err := kvsClient.Get(TEST_KEY, false)
 
 	assert.NoError(t, err, "Expecting no error while reading existing key")
 	assert.Equal(t, v, bar, "Sequential consistency check")

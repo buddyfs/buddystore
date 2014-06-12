@@ -73,7 +73,7 @@ func (lm *LManagerClient) RLock(key string, forceNoCache bool) (version uint, er
 	}
 	retLockID, ver, _, err := lm.Ring.Transport().RLock(LMVnodes[0], key, lm.Ring.GetLocalVnode().String(), nil)
 	if err != nil {
-		return 0, fmt.Errorf("Cannot get ReadLock due to ", err)
+		return 0, err
 	}
 	lm.RLocks[key] = &RLockVal{lockID: retLockID, version: ver}
 	return ver, nil
@@ -87,7 +87,7 @@ func (lm *LManagerClient) WLock(key string, version uint, timeout uint) (uint, e
 
 	retLockID, ver, timeout, _, err := lm.Ring.Transport().WLock(LMVnodes[0], key, version, timeout, lm.Ring.GetLocalVnode().String(), nil)
 	if err != nil {
-		return ver, fmt.Errorf("Cannot get the write lock ", err)
+		return ver, err
 	}
 	lm.wLockMut.Lock()
 	lm.WLocks[key] = &WLockVal{lockID: retLockID, version: ver, timeout: timeout}
