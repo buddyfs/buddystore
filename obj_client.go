@@ -33,22 +33,21 @@ func NewKVStoreClientWithLM(ringIntf RingIntf, lm LMClientIntf) *KVStoreClientIm
 	return &KVStoreClientImpl{ring: ringIntf, lm: lm}
 }
 
-/*
- * Inform the lock manager we're interested in reading the value for key.
- * Expected return value: current version number associated with key.
- * Expected error conditions:
- *   - Network failure     => Retryable failure
- *   - Key does not exist  => Fail immediately
- *
- * Once current version number has been successfully read, contact nodes
- * KV Store to read value at expected version.
- * Expected error conditions:
- *   - Key/version does not exist  => Retry with another node
- *   - All nodes returned error    => Fail
- *
- * Optimization:
- *   - Prioritize reading from local vnode if one of them may contain this data.
- */
+// Inform the lock manager we're interested in reading the value for key.
+// Expected return value:
+//    Current version number associated with key
+// Expected error conditions:
+//    Network failure     => Retryable failure
+//    Key does not exist  => Fail immediately
+//
+// Once current version number has been successfully read, contact nodes
+// KV Store to read value at expected version.
+// Expected error conditions:
+//    Key/version does not exist  => Retry with another node
+//    All nodes returned error    => Fail
+//
+// Optimization:
+//    Prioritize reading from local vnode if one of them may contain this data.
 func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
 	var err error = fmt.Errorf("DUMMY")
 	var val []byte
@@ -123,34 +122,33 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 	return nil, fmt.Errorf("All read replicas failed")
 }
 
-/*
- * Inform the lock manager we're interested in setting the value for key.
- * Expected return value: next available version number to write value to.
- * Expected error conditions:
- *   - Network failure     => Retryable failure
- *   - Key does not exist  => Fail immediately
- *   - Access permissions? => Fail immediately
- *
- * Once next version number has been successfully read, contact master
- * KV Store to write value at new version.
- * Expected error conditions:
- *   - Key/version too old  => TODO: Inform lock manager
- *   - Transient error      => TODO: Retry
- *
- * If write operation succeeded without errors, send a commit message to
- * the lock manager to finalize the operation. Until the commit returns
- * successfully, the new version of this value will not be advertised.
- * Expected error conditions:
- *   - Lock not found       => TODO: Return
- *   - Transient error      => TODO: Retry
- *
- * If write operation failed, send an abort message to the lock manager to
- * cancel the operation. This is simply to speed up the lock release operation
- * instead of waiting for a timeout to happen.
- * Expected error conditions:
- *   - Lock not found       => TODO: Return
- *   - Transient error      => TODO: Retry
- */
+// Inform the lock manager we're interested in setting the value for key.
+// Expected return value:
+//    Next available version number to write value to
+// Expected error conditions:
+//    Network failure     => Retryable failure
+//    Key does not exist  => Fail immediately
+//    Access permissions? => Fail immediately
+//
+// Once next version number has been successfully read, contact master
+// KV Store to write value at new version.
+// Expected error conditions:
+//    Key/version too old  => TODO: Inform lock manager
+//    Transient error      => TODO: Retry
+//
+// If write operation succeeded without errors, send a commit message to
+// the lock manager to finalize the operation. Until the commit returns
+// successfully, the new version of this value will not be advertised.
+// Expected error conditions:
+//    Lock not found       => TODO: Return
+//    Transient error      => TODO: Retry
+//
+// If write operation failed, send an abort message to the lock manager to
+// cancel the operation. This is simply to speed up the lock release operation
+// instead of waiting for a timeout to happen.
+// Expected error conditions:
+//    Lock not found       => TODO: Return
+//    Transient error      => TODO: Retry
 func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 	v, err := kv.lm.WLock(key, 0, 10)
 
@@ -163,13 +161,11 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 	return kv.SetVersion(key, v, value)
 }
 
-/*
- * Similar to KVStore.Set, but useful for transactional read-update-write
- * operations along with KVStore.GetForSet.
- *
- * Use the version number from the write lease acquired in KVStore.GetForSet.
- * Perform regular Set operation with commit/abort.
- */
+// Similar to KVStore.Set, but useful for transactional read-update-write
+// operations along with KVStore.GetForSet.
+//
+// Use the version number from the write lease acquired in KVStore.GetForSet.
+// Perform regular Set operation with commit/abort.
 func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) error {
 	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
@@ -205,14 +201,12 @@ func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) 
 	return err
 }
 
-/*
- * Similar to KVStore.Get, but useful for transactional read-update-write
- * operations along with KVStore.SetVersion.
- *
- * First, get a write lease from the lock manager. This prevents any
- * further write operations on the same key. Proceed to read the latest
- * version of the key and get its data, which is returned.
- */
+// Similar to KVStore.Get, but useful for transactional read-update-write
+// operations along with KVStore.SetVersion.
+//
+// First, get a write lease from the lock manager. This prevents any
+// further write operations on the same key. Proceed to read the latest
+// version of the key and get its data, which is returned.
 func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, error) {
 	var err error = fmt.Errorf("DUMMY")
 	var val []byte
