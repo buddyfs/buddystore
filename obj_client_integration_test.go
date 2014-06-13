@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -51,6 +52,8 @@ func TestKVIntegrationCreateThenGetKey(t *testing.T) {
  * Exercise the TCPTransport interface for KVStore (and Lock Manager).
  */
 func TestKVIntegrationTCPTransportTest(t *testing.T) {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	listen1 := fmt.Sprintf("localhost:%d", PORT+12)
 	listen2 := fmt.Sprintf("localhost:%d", PORT+13)
 
@@ -68,7 +71,6 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	conf.Hostname = "localhost:9012" // Bootstrap node
 	conf.NumVnodes = 2
 	r, err := Create(conf, ml1)
-	time.Sleep(50 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("unexpected err. %s", err)
 	}
@@ -78,7 +80,6 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	conf2.Hostname = "localhost:9013"
 	conf2.NumVnodes = 2
 	r2, err := Join(conf2, ml2, conf.Hostname)
-	time.Sleep(50 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("Failed to join the remote ring! Got %s", err)
 	}
@@ -86,7 +87,6 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	kvsClient := NewKVStoreClient(r2)
 
 	bar := []byte("bar")
-	barbar := []byte("barbar")
 
 	err = kvsClient.Set(TEST_KEY, bar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
@@ -96,6 +96,7 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	assert.NoError(t, err, "Expecting no error while reading existing key")
 	assert.Equal(t, v, bar, "Sequential consistency check")
 
+	barbar := []byte("barbar")
 	err = kvsClient.Set(TEST_KEY, barbar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
 

@@ -6,20 +6,20 @@ import (
 )
 
 type BuddyStoreError struct {
-	Err       error
+	Err       string
 	Transient bool
 }
 
 func PermanentError(str string, args ...interface{}) BuddyStoreError {
-	return BuddyStoreError{Err: fmt.Errorf(str, args), Transient: false}
+	return BuddyStoreError{Err: fmt.Sprintf(str, args), Transient: false}
 }
 
 func TransientError(str string, args ...interface{}) BuddyStoreError {
-	return BuddyStoreError{Err: fmt.Errorf(str, args), Transient: true}
+	return BuddyStoreError{Err: fmt.Sprintf(str, args), Transient: true}
 }
 
 func (bse BuddyStoreError) Error() string {
-	return bse.Err.Error()
+	return bse.Err
 }
 
 func (bse BuddyStoreError) Temporary() bool {

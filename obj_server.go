@@ -52,27 +52,35 @@ func (kvs *KVStore) get(key string, version uint) ([]byte, error) {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
 
+	// fmt.Printf("[%s] GET(%s, %d)\n", kvs.vn, key, version)
+
 	kvLst, found := kvs.kv[key]
 
 	if !found {
+		// fmt.Printf("[%s] GET(%s, %d) KEY NOT FOUND\n", kvs.vn, key, version)
 		return nil, fmt.Errorf("Key not found")
 	} else {
 		for i := kvLst.Front(); i != nil; i = i.Next() {
 			// Found the key value matching the requested version
 			if i.Value.(*KVStoreValue).Ver == version {
+				// fmt.Printf("[%s] GET(%s, %d) => %s\n", kvs.vn, key, version, i.Value.(*KVStoreValue).Val)
 				return i.Value.(*KVStoreValue).Val, nil
 			}
 		}
 
+		// fmt.Printf("[%s] GET(%s, %d) VERSION NOT FOUND\n", kvs.vn, key, version)
 		return nil, fmt.Errorf("Key value with requested version not found")
 	}
 
+	// fmt.Printf("[%s] GET(%s, %d) ERROR CONDITION\n", kvs.vn, key, version)
 	return nil, nil
 }
 
 func (kvs *KVStore) set(key string, version uint, value []byte) error {
 	kvs.kvLock.Lock()
 	defer kvs.kvLock.Unlock()
+
+	// fmt.Printf("[%s] SET(%s, %d, %s)\n", kvs.vn, key, version, value)
 
 	kvVal := &KVStoreValue{Ver: version, Val: value}
 

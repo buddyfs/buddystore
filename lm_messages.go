@@ -14,7 +14,7 @@ type tcpBodyLMRLockResp struct {
 	CommitPoint uint64
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyLMWLockReq struct {
@@ -33,7 +33,7 @@ type tcpBodyLMWLockResp struct {
 	CommitPoint uint64
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyLMCommitWLockReq struct {
@@ -49,7 +49,7 @@ type tcpBodyLMCommitWLockResp struct {
 	CommitPoint uint64
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyLMAbortWLockReq struct {
@@ -65,7 +65,7 @@ type tcpBodyLMAbortWLockResp struct {
 	CommitPoint uint64
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyLMInvalidateRLockReq struct {
@@ -77,5 +77,5 @@ type tcpBodyLMInvalidateRLockResp struct {
 	Dummy bool
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }

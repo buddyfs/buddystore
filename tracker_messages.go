@@ -10,5 +10,5 @@ type tcpBodyJoinRingResp struct {
 	Vnodes []*Vnode
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }

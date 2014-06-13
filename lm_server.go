@@ -209,6 +209,10 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 			return "", 0, lm.CommitPoint, TransientError("Retry Later. Expected : Atleast 2 successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
+			if vnodes[i] == nil {
+				continue
+			}
+
 			_, _, _, err := lm.Ring.Transport().RLock(vnodes[i], key, lm.Vn.String(), opsLogEntry)
 			if err != nil {
 				return "", 0, lm.CommitPoint, TransientError("Retry : Cannot replicate operation to enough replica")
@@ -372,6 +376,10 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 			return lm.CommitPoint, TransientError("Retry Later. Expected : Atleast ", NUM_LM_REPLICA, " successors to the LockManager, but only ", len(vnodes), " are available")
 		}
 		for i := range vnodes {
+			if vnodes[i] == nil {
+				continue
+			}
+
 			_, err := lm.Ring.Transport().CommitWLock(vnodes[i], key, version, lm.Vn.String(), opsLogEntry)
 			if err != nil {
 				lm.OpsLog = lm.OpsLog[:len(lm.OpsLog)-1]

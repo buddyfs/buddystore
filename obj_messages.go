@@ -49,12 +49,12 @@ type tcpBodyRespValue struct {
 	Value []byte
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyRespKeys struct {
 	Keys []string
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }

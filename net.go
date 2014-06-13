@@ -78,37 +78,55 @@ type tcpHeader struct {
 type tcpRequest interface {
 }
 
-type tcpResponseBody interface {
+type TCPResponseBody interface {
 }
 
-type tcpResponse interface {
+type TCPResponse interface {
 	Error() error
 	SetError(error)
 }
 
-type tcpResponseImpl struct {
-	Err error
+type TCPResponseImpl struct {
+	Err string `json:"err,string,omitempty"`
 
 	// Implements:
-	tcpResponse
+	TCPResponse `json:"-"`
 }
 
-func (t *tcpResponseImpl) Error() error {
-	return t.Err
+func (t *TCPResponseImpl) Error() error {
+	if t.Err != "" {
+		var nerr BuddyStoreError
+		json.Unmarshal([]byte(t.Err), &nerr)
+		// fmt.Println("TCPResponseImpl: ", t.Err)
+		return nerr
+	}
+	return nil
 }
 
-func (t *tcpResponseImpl) SetError(err error) {
-	t.Err = err
+func (t *TCPResponseImpl) SetError(err error) {
+	if err != nil {
+		var nerr BuddyStoreError
+		var ok bool
+
+		if nerr, ok = err.(BuddyStoreError); ok {
+		} else {
+			nerr = PermanentError(err.Error())
+		}
+
+		e, _ := json.Marshal(nerr)
+		t.Err = string(e)
+		// fmt.Println("Creating error: ", t.Err)
+	}
 }
 
-var _ tcpResponse = new(tcpBodyVnodeListError)
+var _ TCPResponse = new(tcpBodyVnodeListError)
 
 // Potential body types
 type tcpBodyError struct {
 	Dummy bool
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 type tcpBodyString struct {
 	S string
@@ -130,21 +148,21 @@ type tcpBodyVnodeError struct {
 	Vnode *Vnode
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyVnodeListError struct {
 	Vnodes []*Vnode
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 type tcpBodyBoolError struct {
 	B bool
 
 	// Extends:
-	tcpResponseImpl
+	TCPResponseImpl
 }
 
 // Creates a new TCP transport on the given listen address with the
@@ -260,7 +278,7 @@ func (t *TCPTransport) setupConn(c *net.TCPConn) {
 	c.SetKeepAlive(true)
 }
 
-func (t *TCPTransport) networkCall(host string, tcpReqType int, req tcpRequest, resp tcpResponse) error {
+func (t *TCPTransport) networkCall(host string, tcpReqType int, req tcpRequest, resp TCPResponse) error {
 	// Get a conn
 	out, err := t.getConn(host)
 	if err != nil {
@@ -286,6 +304,8 @@ func (t *TCPTransport) networkCall(host string, tcpReqType int, req tcpRequest, 
 		if err := out.dec.Decode(resp); err != nil {
 			errChan <- err
 		}
+
+		// glog.Infof("Resp: %s", resp.Error())
 
 		// Return the connection
 		t.returnConn(out)
@@ -599,7 +619,7 @@ func (t *TCPTransport) RLock(target *Vnode, key string, nodeID string, opsLogEnt
 	err := t.networkCall(target.Host, tcpRLockReq, tcpBodyLMRLockReq{Vn: target, Key: key, SenderID: nodeID, SenderAddr: t.sock.Addr().String(), OpsLogEntryPrimary: opsLogEntry}, &resp)
 
 	if err != nil {
-		return "", 0, 0, resp.Err
+		return "", 0, 0, resp.Error()
 	} else {
 		return resp.LockId, resp.Version, resp.CommitPoint, nil
 	}
@@ -636,7 +656,7 @@ func (t *TCPTransport) CommitWLock(target *Vnode, key string, version uint, node
 	err := t.networkCall(target.Host, tcpCommitWLockReq, body, &resp)
 
 	if err != nil {
-		return 0, resp.Err
+		return 0, resp.Error()
 	} else {
 		return resp.CommitPoint, nil
 	}
@@ -679,10 +699,10 @@ func (t *TCPTransport) InvalidateRLock(target *Vnode, lockID string) error {
 
 		// Return the connection
 		t.returnConn(out)
-		if resp.Err == nil {
+		if resp.Error() == nil {
 			respChan <- true
 		} else {
-			errChan <- resp.Err
+			errChan <- resp.Error()
 		}
 	}()
 
@@ -690,9 +710,9 @@ func (t *TCPTransport) InvalidateRLock(target *Vnode, lockID string) error {
 	case <-time.After(t.timeout):
 		return fmt.Errorf("Command timed out!")
 	case _ = <-errChan:
-		return resp.Err
+		return resp.Error()
 	case <-respChan:
-		return resp.Err
+		return resp.Error()
 	}
 }
 
@@ -707,7 +727,7 @@ func (t *TCPTransport) AbortWLock(target *Vnode, key string, version uint, nodeI
 	err := t.networkCall(target.Host, tcpAbortWLockReq, body, &resp)
 
 	if err != nil {
-		return 0, resp.Err
+		return 0, resp.Error()
 	} else {
 		return resp.CommitPoint, nil
 	}
@@ -726,7 +746,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 	dec := json.NewDecoder(conn)
 	enc := json.NewEncoder(conn)
 	header := tcpHeader{}
-	var sendResp tcpResponse
+	var sendResp TCPResponse
 	for {
 		// Get the header
 		if err := dec.Decode(&header); err != nil {
@@ -788,10 +808,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				node, err := obj.GetPredecessor()
 				resp.Vnode = node
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpNotifyReq:
@@ -808,10 +828,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				nodes, err := obj.Notify(body.Vn)
 				resp.Vnodes = trimSlice(nodes)
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Target.Host, body.Target.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String()))
 			}
 
 		case tcpFindSucReq:
@@ -828,10 +848,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				nodes, err := obj.FindSuccessors(body.Num, body.Key)
 				resp.Vnodes = trimSlice(nodes)
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Target.Host, body.Target.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String()))
 			}
 
 		case tcpClearPredReq:
@@ -846,10 +866,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				resp.Err = obj.ClearPredecessor(body.Vn)
+				resp.SetError(obj.ClearPredecessor(body.Vn))
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Target.Host, body.Target.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String()))
 			}
 
 		case tcpSkipSucReq:
@@ -864,10 +884,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			resp := tcpBodyError{}
 			sendResp = &resp
 			if ok {
-				resp.Err = obj.SkipSuccessor(body.Vn)
+				resp.SetError(obj.SkipSuccessor(body.Vn))
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Target.Host, body.Target.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String()))
 			}
 
 		case tcpGetPredListReq:
@@ -884,10 +904,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				nodes, err := obj.GetPredecessorList()
 				resp.Vnodes = nodes
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpGet:
@@ -904,10 +924,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				value, err := obj.Get(body.Key, body.Version)
 				resp.Value = value
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpSet:
@@ -924,10 +944,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				err := obj.Set(body.Key, body.Version, body.Value)
 
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpList:
@@ -944,10 +964,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				keys, err := obj.List()
 				resp.Keys = keys
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpBulkSet:
@@ -964,10 +984,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				err := obj.BulkSet(body.Key, body.ValueLst)
 
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpSyncKeys:
@@ -983,10 +1003,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if ok {
 				err := obj.SyncKeys(body.OwnerVn, body.Key, body.Version)
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpMissingKeys:
@@ -1002,10 +1022,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if ok {
 				err := obj.MissingKeys(body.ReplVn, body.Key, body.Version)
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpPurgeVersions:
@@ -1021,10 +1041,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if ok {
 				err := obj.PurgeVersions(body.Key, body.MaxVersion)
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vnode.Host, body.Vnode.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vnode.Host, body.Vnode.String()))
 			}
 
 		case tcpJoinRingReq:
@@ -1041,10 +1061,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				vnodes, err := obj.JoinRing(body.RingId, body.Joiner)
 				resp.Vnodes = vnodes
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Target.Host, body.Target.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Target.Host, body.Target.String()))
 			}
 
 		case tcpRLockReq:
@@ -1062,13 +1082,13 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 				lockId, version, cp, err :=
 					obj.RLock(body.Key, body.SenderID, body.SenderAddr, body.OpsLogEntryPrimary)
 
-				resp.Err = err
+				resp.SetError(err)
 				resp.LockId = lockId
 				resp.Version = version
 				resp.CommitPoint = cp
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpWLockReq:
@@ -1086,14 +1106,14 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 				lockId, version, timeout, commitPoint, err :=
 					obj.WLock(body.Key, body.Version, body.Timeout, body.SenderID, body.OpsLogEntryPrimary)
 
-				resp.Err = err
+				resp.SetError(err)
 				resp.LockId = lockId
 				resp.Version = version
 				resp.Timeout = timeout
 				resp.CommitPoint = commitPoint
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpCommitWLockReq:
@@ -1110,10 +1130,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				cp, err := obj.CommitWLock(body.Key, body.Version, body.SenderID, body.OpsLogEntryPrimary)
 				resp.CommitPoint = cp
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpAbortWLockReq:
@@ -1130,10 +1150,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			if ok {
 				cp, err := obj.AbortWLock(body.Key, body.Version, body.SenderID, body.OpsLogEntryPrimary)
 				resp.CommitPoint = cp
-				resp.Err = err
+				resp.SetError(err)
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		case tcpInvalidateRLockReq:
@@ -1149,10 +1169,10 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			sendResp = &resp
 			if obj != nil {
 				_ = obj.obj.InvalidateRLock(body.LockID)
-				resp.Err = nil // Change it to incorporate the error from the client
+				resp.SetError(nil) // Change it to incorporate the error from the client
 			} else {
-				resp.Err = fmt.Errorf("Target VN not found! Target %s:%s",
-					body.Vn.Host, body.Vn.String())
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
 			}
 
 		default:

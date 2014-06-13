@@ -54,6 +54,7 @@ func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
 
 	for err != nil {
 		val, err = kv.getWithoutRetry(key)
+		// glog.Infof("Get(key) => %s [Err: %s]", val, err)
 		if !retry || !isRetryable(err) {
 			return val, err
 		}
@@ -93,6 +94,7 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 		if kv.ring.Transport().IsLocalVnode(vnode) {
 			succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
 			value, err := kv.ring.Transport().Get(vnode, key, v)
+			// fmt.Printf("GetSubLocal(key, vnode) => %s [Err: %s]\n", value, err)
 
 			// If operation failed, try another node
 			if err == nil {
@@ -112,6 +114,7 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 
 		// Perform read operation on the random node
 		value, err := kv.ring.Transport().Get(node, key, v)
+		// fmt.Printf("GetSub(key, vnode) => %s [Err: %s]\n", value, err)
 
 		// If operation failed, try another node
 		if err == nil {
@@ -150,12 +153,21 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 //    Lock not found       => TODO: Return
 //    Transient error      => TODO: Retry
 func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
-	v, err := kv.lm.WLock(key, 0, 10)
+	var err error = fmt.Errorf("DUMMY")
+	var v uint
 
-	// TODO: Inspect error and determine if we can retry the operation.
-	if err != nil {
-		glog.Errorf("Error acquiring WLock in Set(%q): %d, %q", key, v, err)
-		return err
+	for err != nil {
+		v, err = kv.lm.WLock(key, 0, 10)
+		if err == nil {
+			break
+		}
+		if !isRetryable(err) {
+			return err
+		}
+
+		// TODO: Use some kind of backoff mechanism, like in
+		//       https://github.com/cenkalti/backoff
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return kv.SetVersion(key, v, value)
