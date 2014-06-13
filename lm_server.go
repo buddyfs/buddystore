@@ -188,7 +188,7 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 	version := lm.VersionMap[key]
 	lm.verMapMut.Unlock()
 	if version == 0 {
-		return "", 0, lm.CommitPoint, fmt.Errorf("ReadLock not possible. Key not present in LM")
+		return "", 0, lm.CommitPoint, fmt.Errorf("[%s] ReadLock not possible. Key not present in LM", lm.Vn.Host)
 	}
 
 	lockID, err := getLockID()
