@@ -214,6 +214,7 @@ func (tr *TrackerImpl) handleJoinRing(ringId string, joiner *Vnode) ([]*Vnode, e
 		nodesInRing = []*Vnode{}
 	} else {
 		json.Unmarshal(val, nodesInRing)
+		glog.Infof("Existing nodes in ring: %s", nodesInRing)
 	}
 
 	newNodesInRing = append(nodesInRing, joiner)
