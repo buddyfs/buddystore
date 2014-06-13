@@ -13,7 +13,7 @@ import (
 	"github.com/huin/goupnp/dcps/internetgateway1"
 )
 
-const LISTEN_TIMEOUT = 5 * time.Second
+const LISTEN_TIMEOUT = 30 * time.Second
 
 // Generates a random stabilization time
 func randStabilize(conf *Config) time.Duration {

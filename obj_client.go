@@ -81,7 +81,7 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	if glog.V(2) {
+	if glog.V(5) {
 		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
@@ -183,6 +183,29 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 // Use the version number from the write lease acquired in KVStore.GetForSet.
 // Perform regular Set operation with commit/abort.
 func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) error {
+	var err error = fmt.Errorf("DUMMY")
+
+	for err != nil {
+		err = kv.setVersionWithoutRetry(key, version, value)
+
+		if err == nil {
+			return nil
+		}
+
+		if !isRetryable(err) {
+			return err
+		}
+
+		// TODO: Use some kind of backoff mechanism, like in
+		//       https://github.com/cenkalti/backoff
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// TODO: Unreachable code
+	return nil
+}
+
+func (kv *KVStoreClientImpl) setVersionWithoutRetry(key string, version uint, value []byte) error {
 	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
 		glog.Errorf("Error listing successors in Set(%q): %q", key, err)
@@ -194,7 +217,7 @@ func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) 
 		return fmt.Errorf("No Successors found")
 	}
 
-	if glog.V(2) {
+	if glog.V(5) {
 		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
