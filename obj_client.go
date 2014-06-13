@@ -96,7 +96,7 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 
 			// If operation failed, try another node
 			if err == nil {
-				return value, err
+				return value, nil
 			}
 		}
 	}
@@ -115,7 +115,7 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 
 		// If operation failed, try another node
 		if err == nil {
-			return value, err
+			return value, nil
 		}
 	}
 

@@ -1,7 +1,7 @@
 package buddystore
 
 import (
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -42,8 +42,8 @@ type tcpOutConn struct {
 	host   string
 	sock   *net.TCPConn
 	header tcpHeader
-	enc    *gob.Encoder
-	dec    *gob.Decoder
+	enc    *json.Encoder
+	dec    *json.Decoder
 	used   time.Time
 }
 
@@ -229,8 +229,8 @@ func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 	// Setup the socket
 	sock := conn.(*net.TCPConn)
 	t.setupConn(sock)
-	enc := gob.NewEncoder(sock)
-	dec := gob.NewDecoder(sock)
+	enc := json.NewEncoder(sock)
+	dec := json.NewDecoder(sock)
 	now := time.Now()
 
 	// Wrap the sock
@@ -723,8 +723,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 		conn.Close()
 	}()
 
-	dec := gob.NewDecoder(conn)
-	enc := gob.NewEncoder(conn)
+	dec := json.NewDecoder(conn)
+	enc := json.NewEncoder(conn)
 	header := tcpHeader{}
 	var sendResp tcpResponse
 	for {

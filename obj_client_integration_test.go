@@ -86,14 +86,23 @@ func TestKVIntegrationTCPTransportTest(t *testing.T) {
 	kvsClient := NewKVStoreClient(r2)
 
 	bar := []byte("bar")
+	barbar := []byte("barbar")
 
 	err = kvsClient.Set(TEST_KEY, bar)
 	assert.NoError(t, err, "Writing to new key should have no failures")
 
-	v, err := kvsClient.Get(TEST_KEY, false)
+	v, err := kvsClient.Get(TEST_KEY, true)
 
 	assert.NoError(t, err, "Expecting no error while reading existing key")
 	assert.Equal(t, v, bar, "Sequential consistency check")
+
+	err = kvsClient.Set(TEST_KEY, barbar)
+	assert.NoError(t, err, "Writing to new key should have no failures")
+
+	v, err = kvsClient.Get(TEST_KEY, true)
+
+	assert.NoError(t, err, "Expecting no error while reading existing key")
+	assert.Equal(t, v, barbar, "Sequential consistency check")
 
 	r.Shutdown()
 	r2.Shutdown()

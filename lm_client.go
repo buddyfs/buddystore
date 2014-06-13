@@ -114,6 +114,10 @@ func (lm *LManagerClient) CommitWLock(key string, version uint) error {
 	}
 	delete(lm.WLocks, key) //  Delete key from local write locks
 
+	lm.rLockMut.Lock()
+	defer lm.rLockMut.Unlock()
+	delete(lm.RLocks, key) //  Delete key from local read locks
+
 	return nil
 }
 
