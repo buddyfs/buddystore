@@ -225,7 +225,11 @@ func (tr *TrackerImpl) handleJoinRing(ringId string, joiner *Vnode) ([]*Vnode, e
 		return nil, err
 	}
 
-	tr.kvClient.SetVersion(ringId, version, writeBack)
+	glog.Infof("Sending response %s", string(writeBack))
+
+	err = tr.kvClient.SetVersion(ringId, version, writeBack)
+
+	glog.Infof("Error setting ring data: %s", err)
 
 	return nodesInRing, nil
 }
