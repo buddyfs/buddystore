@@ -178,7 +178,7 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 
 	if !lm.CurrentLM {
 		if opsLogInEntry == nil {
-			return "", 0, 0, TransientError("[%s] 500: Retry, RLock request reached the non-Primary Lock Manager", lm.Vn.Id)
+			return "", 0, 0, TransientError("[%s] 500: Retry, RLock request reached the non-Primary Lock Manager", lm.Vn.Host)
 		}
 		lm.appendToLog(opsLogInEntry)
 		return opsLogInEntry.LockId, opsLogInEntry.Version, lm.CommitPoint, nil
