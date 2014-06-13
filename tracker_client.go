@@ -44,6 +44,8 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, localOnly bool) (*Ring, err
 		// I'm the first person joining the ring.
 		// Create the ring and wait for others to join.
 
+		glog.Infof("**** No one in the ring right now. Bootstrapping the ring. ******")
+
 		ring, err := Create(conf, transport)
 		if err != nil {
 			return nil, err
