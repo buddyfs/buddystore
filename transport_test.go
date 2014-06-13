@@ -97,6 +97,10 @@ func (mv *MockVnodeRPC) AbortWLock(key string, version uint, nodeID string, opsL
 	return 0, nil
 }
 
+func (mv *MockVnodeRPC) UpdateVersionMap(versionMap *map[string]uint) {
+	return
+}
+
 func (vn *MockVnodeRPC) JoinRing(ringId string, self *Vnode) ([]*Vnode, error) {
 	return nil, nil
 }

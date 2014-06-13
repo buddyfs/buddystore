@@ -59,7 +59,7 @@ func (tr *TrackerClientImpl) JoinRing(ringId string, localOnly bool) (*Ring, err
 			glog.Infof("[Ring: %s] Connecting to %s", ringId, vnode.Host)
 		}
 
-		ring, err := Join(conf, transport, vnode.Host)
+		ring, err := BlockingJoin(conf, transport, vnode.Host)
 		if err == nil {
 			return ring, nil
 		}
