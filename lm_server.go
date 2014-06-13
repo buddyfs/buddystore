@@ -196,26 +196,6 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 		return "", 0, lm.CommitPoint, err
 	}
 
-	lm.rLockMut.Lock()
-
-	if lm.RLocks == nil {
-		lm.RLocks = make(map[string]*RLockEntry)
-	}
-
-	if lm.RLocks[key] == nil {
-		lm.RLocks[key] = &RLockEntry{}
-	}
-	rLockEntry := lm.RLocks[key]
-
-	if rLockEntry.CopySet == nil {
-		rLockEntry.CopySet = make(map[string][]string)
-	}
-
-	rLockEntry.CopySet[nodeID] = make([]string, 2)
-	rLockEntry.CopySet[nodeID][0] = lockID     // Added the nodeID to the CopySet for the given key
-	rLockEntry.CopySet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
-	lm.rLockMut.Unlock()
-
 	lm.opsLogMut.Lock()
 	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
@@ -235,6 +215,25 @@ func (lm *LManager) createRLock(key string, nodeID string, remoteAddr string, op
 			}
 		}
 	}
+	lm.rLockMut.Lock()
+
+	if lm.RLocks == nil {
+		lm.RLocks = make(map[string]*RLockEntry)
+	}
+
+	if lm.RLocks[key] == nil {
+		lm.RLocks[key] = &RLockEntry{}
+	}
+	rLockEntry := lm.RLocks[key]
+
+	if rLockEntry.CopySet == nil {
+		rLockEntry.CopySet = make(map[string][]string)
+	}
+
+	rLockEntry.CopySet[nodeID] = make([]string, 2)
+	rLockEntry.CopySet[nodeID][0] = lockID     // Added the nodeID to the CopySet for the given key
+	rLockEntry.CopySet[nodeID][1] = remoteAddr // Remote address added to invalidate it when a commit happens to this key
+	lm.rLockMut.Unlock()
 
 	return lockID, version, lm.CommitPoint, nil
 }
@@ -359,13 +358,6 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 		return lm.CommitPoint, fmt.Errorf("Requested version doesn't match with the version locked. Cannot commit")
 	}
 
-	lm.verMapMut.Lock()
-	/*TODO Wait until the backup LMs also perform the same operation and then commit it */
-	if lm.VersionMap == nil {
-		lm.VersionMap = make(map[string]uint)
-	}
-	lm.VersionMap[key] = version
-	lm.verMapMut.Unlock()
 	lm.opsLogMut.Lock()
 	defer lm.opsLogMut.Unlock()
 	lm.currOpNum++
@@ -389,6 +381,12 @@ func (lm *LManager) commitWLock(key string, version uint, nodeID string, opsLogI
 	}
 
 	lm.wLockMut.Lock()
+	lm.verMapMut.Lock()
+	if lm.VersionMap == nil {
+		lm.VersionMap = make(map[string]uint)
+	}
+	lm.VersionMap[key] = version
+	lm.verMapMut.Unlock()
 	delete(lm.WLocks, key)
 	lm.wLockMut.Unlock()
 
@@ -465,4 +463,56 @@ func (lm *LManager) abortWLock(key string, version uint, nodeID string, opsLogIn
 	delete(lm.WLocks, key)
 	lm.wLockMut.Unlock()
 	return lm.CommitPoint, nil
+}
+
+func (lm *LManager) ReplayLog() {
+	clearLMForReplay(lm)
+	/*if !lm.SyncWithSuccessors() {
+	    fmt.Println("Genesis : No Replay needed")
+	}*/
+	// (Except for the opsLog Lock) Locks not required as all changes are local only
+	lm.opsLogMut.Lock()
+	for i := range lm.OpsLog {
+		switch lm.OpsLog[i].Op {
+
+		case "WRITE":
+			lm.WLocks[lm.OpsLog[i].Key] = &WLockEntry{nodeID: lm.OpsLog[i].Vn.String(), LockID: lm.OpsLog[i].LockId, version: lm.OpsLog[i].Version, timeout: lm.OpsLog[i].Timeout}
+
+		case "READ":
+			if lm.RLocks == nil {
+				lm.RLocks = make(map[string]*RLockEntry)
+			}
+			if lm.RLocks[lm.OpsLog[i].Key] == nil {
+				lm.RLocks[lm.OpsLog[i].Key] = &RLockEntry{}
+			}
+			rLockEntry := lm.RLocks[lm.OpsLog[i].Key]
+			if rLockEntry.CopySet == nil {
+				rLockEntry.CopySet = make(map[string][]string)
+			}
+			rLockEntry.CopySet[lm.OpsLog[i].Vn.String()] = make([]string, 2)
+			rLockEntry.CopySet[lm.OpsLog[i].Vn.String()][0] = lm.OpsLog[i].LockId  // Added the nodeID to the CopySet for the given key
+			rLockEntry.CopySet[lm.OpsLog[i].Vn.String()][1] = lm.OpsLog[i].Vn.Host // Remote address added to invalidate it when a commit happens to this key
+
+		case "COMMIT":
+			lm.VersionMap[lm.OpsLog[i].Key] = lm.OpsLog[i].Version
+			delete(lm.WLocks, lm.OpsLog[i].Key)
+
+		case "ABORT":
+			delete(lm.WLocks, lm.OpsLog[i].Key)
+
+		default:
+			// No-op
+		}
+	}
+	lm.opsLogMut.Unlock()
+}
+
+/*   TODO : What if I have no log? Two possibilities
+1. I just joined. Go and ask the successor for the opsLog and replay it.
+2. Its genesis, there was no LM before this. Go and ask the successor to confirm it.
+Well, just ask the successor and execute whatever you have to..
+Return true, if the successor has state, else return false (birth)
+*/
+func (lm *LManager) SyncWithSuccessor() bool {
+	return false
 }

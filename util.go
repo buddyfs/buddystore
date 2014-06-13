@@ -118,14 +118,6 @@ func mergeErrors(err1, err2 error) error {
 	}
 }
 
-func printLogs(opsLog []*OpsLogEntry) {
-	fmt.Println("*** LOCK OPERATIONS LOGS ***")
-	for i := range opsLog {
-		fmt.Println(opsLog[i].OpNum, " | ", opsLog[i].Op, " | ", opsLog[i].Key, " - ", opsLog[i].Version, " | ", opsLog[i].Timeout)
-	}
-	fmt.Println()
-}
-
 func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 	upnpclient, _, err := internetgateway1.NewWANIPConnection1Clients()
 	if err == nil && len(upnpclient) > 0 {

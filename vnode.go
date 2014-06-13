@@ -224,22 +224,25 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 					if err != nil {
 						fmt.Println("Lookup for LockManager failed with error ", err)
 					}
+
+					/* Once a lock manager starts operating, it should care about only two possibilies in terms of failure handling
+					   1. Node joining as its predecessor and becoming the LM
+					   2. Node dying before it and making it the LM or It just joined and found that it is the LM, in which case its opslog will be empty
+					*/
 					if vn.String() == LMVnodes[0].String() {
 						if vn.lm.CurrentLM {
 							// No-op
 						} else {
+							vn.lm.SyncWithSuccessor()
+							vn.lm.ReplayLog()
 							vn.lm.CurrentLM = true
-							/* TODO : I am the new LockManager, two cases :
-							   1. The previous LockManager died
-							   2. I just joined and figured out that I am the LockManager.
-							*/
-
 						}
 					} else {
 						if vn.lm.CurrentLM {
-							//  I was the LockManager (or I am the one with the best knowledge of the previous LM) , now someone else has joined, give him the full LockState and set his CurrentLM when he is ready.
-						} else {
+							fmt.Println("Lost LockManager status")
+							// Keep Calm and handle requests. You will eventually get a getLockOps call from the new LM
 							vn.lm.CurrentLM = false
+						} else {
 							// No-op
 						}
 					}

@@ -251,6 +251,73 @@ func TestJoinLockRemote(t *testing.T) {
 	r2.Shutdown()
 }
 
+// Check if LogReplay kicks in when a Node joins/leaves
+// TODO : Find how to kill a node
+/*
+func TestLogReplayOnNodeLeave(t *testing.T) {
+	listen1 := fmt.Sprintf("localhost:%d", PORT+9)
+	listen2 := fmt.Sprintf("localhost:%d", PORT+10)
+
+	t1, err1 := InitTCPTransport(listen1, timeout)
+	t2, err2 := InitTCPTransport(listen2, timeout)
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Error while trying to create TCP transports")
+	}
+
+	ml1 := InitLocalTransport(t1)
+	ml2 := InitLocalTransport(t2)
+
+	// Create the initial ring
+	conf := fastConf()
+    conf.NumVnodes = 2
+	conf.Hostname = "localhost:9009" // I know who am going to bootstrap with
+	r, err := Create(conf, ml1)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
+	if err != nil {
+		t.Fatalf("unexpected err. %s", err)
+	}
+
+	// Create a second ring
+	conf2 := fastConf()
+    conf2.NumVnodes = 1
+	conf2.Hostname = "localhost:9010" //  I know where I reside
+	r2, err := Join(conf2, ml2, conf.Hostname)
+	// Wait for stabilization
+	time.Sleep(50 * time.Millisecond)
+
+	if err != nil {
+		t.Fatalf("Failed to join the remote ring! Got %s", err)
+	}
+	// lm is the LockManagerClient for the new combined ring
+	version, err := r2.vnodes[0].lm_client.WLock(TEST_KEY, 1, 10)
+	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY, version)
+	readVersion, err := r2.vnodes[0].lm_client.RLock(TEST_KEY, true)
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+
+	version, err = r2.vnodes[0].lm_client.WLock(TEST_KEY_1, 1, 10)
+	err = r2.vnodes[0].lm_client.CommitWLock(TEST_KEY_1, version)
+	readVersion, err = r2.vnodes[0].lm_client.RLock(TEST_KEY_1, true)
+	if err != nil {
+		t.Fatalf("Error while reading version 1 of key_1 from remote server")
+	}
+	if readVersion != 1 {
+		t.Fatalf("Version mismatch : Expected version 1, got ", readVersion, " instead")
+	}
+    time.Sleep(1 * time.Second)
+    LMVnodes, err := r2.Lookup(1, []byte(r2.GetRingId()))
+    (r2.transport.(*LocalTransport)).Deregister(&r2.vnodes[0].Vnode)
+    LMVnodes, err = r2.Lookup(1, []byte(r2.GetRingId()))
+    time.Sleep(1 * time.Second)
+
+	r.Shutdown()
+	r2.Shutdown()
+}
+*/
+
 //  This is a end-to-end integration test. From Vnode to Vnode.
 func TestRLockInvalidate(t *testing.T) {
 	<-time.After(100 * time.Millisecond)
