@@ -213,8 +213,8 @@ func (tr *TrackerImpl) handleJoinRing(ringId string, joiner *Vnode) ([]*Vnode, e
 		glog.Errorf("Unable to get current tracker status")
 		nodesInRing = []*Vnode{}
 	} else {
-		json.Unmarshal(val, nodesInRing)
-		glog.Infof("Existing nodes in ring: %s", nodesInRing)
+		err := json.Unmarshal(val, &nodesInRing)
+		glog.Infof("Existing nodes in ring [err=%s]: %s, %s", err, string(val), nodesInRing)
 	}
 
 	newNodesInRing = append(nodesInRing, joiner)
