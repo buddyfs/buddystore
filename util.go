@@ -135,8 +135,9 @@ func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 			}
 			addrs, _ := iface.Addrs()
 
-			if len(addrs) > 0 {
-				glog.Infof("Local Address: %s", addrs[0].(*net.IPNet).IP.String())
+			// TODO: Figure out how to handle IPv6 addresses.
+			if len(addrs) > 0 && addrs[0].(*net.IPNet).IP.To4() != nil {
+				glog.Infof("Local Address: %s", addrs[0].(*net.IPNet).IP.To4().String())
 				localAddr = addrs[0].(*net.IPNet).IP.String()
 				return
 			}

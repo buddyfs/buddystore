@@ -11,14 +11,15 @@ import (
 type KVStoreClient interface {
 	Get(key string, retry bool) ([]byte, error)
 	Set(key string, val []byte) error
+	GetForSet(key string, retry bool) ([]byte, uint, error)
+	SetVersion(key string, version uint, val []byte) error
 }
 
 type KVStoreClientImpl struct {
 	ring RingIntf
 	lm   LMClientIntf
 
-	// Implements
-	KVStoreClient
+	// Implements: KVStoreClient
 }
 
 var _ KVStoreClient = &KVStoreClientImpl{}
@@ -32,12 +33,28 @@ func NewKVStoreClientWithLM(ringIntf RingIntf, lm LMClientIntf) *KVStoreClientIm
 	return &KVStoreClientImpl{ring: ringIntf, lm: lm}
 }
 
+/*
+ * Inform the lock manager we're interested in reading the value for key.
+ * Expected return value: current version number associated with key.
+ * Expected error conditions:
+ *   - Network failure     => Retryable failure
+ *   - Key does not exist  => Fail immediately
+ *
+ * Once current version number has been successfully read, contact nodes
+ * KV Store to read value at expected version.
+ * Expected error conditions:
+ *   - Key/version does not exist  => Retry with another node
+ *   - All nodes returned error    => Fail
+ *
+ * Optimization:
+ *   - Prioritize reading from local vnode if one of them may contain this data.
+ */
 func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
 	var err error = fmt.Errorf("DUMMY")
 	var val []byte
 
 	for err != nil {
-		val, err = kv.GetWithoutRetry(key)
+		val, err = kv.getWithoutRetry(key)
 		if !retry || !isRetryable(err) {
 			return val, err
 		}
@@ -50,18 +67,7 @@ func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
 	return val, nil
 }
 
-/*
- * Basic KV store Get operation
- * TODO: Improve Godoc
- */
-func (kv KVStoreClientImpl) GetWithoutRetry(key string) ([]byte, error) {
-	/*
-	 * Inform the lock manager we're interested in reading the value for key.
-	 * Expected return value: current version number associated with key.
-	 * Expected error conditions:
-	 *   - Network failure     => Retryable failure
-	 *   - Key does not exist  => Fail immediately
-	 */
+func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 	v, err := kv.lm.RLock(key, false)
 
 	if err != nil {
@@ -84,8 +90,21 @@ func (kv KVStoreClientImpl) GetWithoutRetry(key string) ([]byte, error) {
 		return nil, fmt.Errorf("No Successors found")
 	}
 
+	for i, vnode := range succVnodes {
+		if kv.ring.Transport().IsLocalVnode(vnode) {
+			succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
+			value, err := kv.ring.Transport().Get(vnode, key, v)
+
+			// If operation failed, try another node
+			if err == nil {
+				return value, err
+			}
+		}
+	}
+
 	// TODO: Performance optimization:
 	// Make parallel calls and take the fastest successful response.
+
 	for len(succVnodes) > 0 {
 		// Pick a random node in the list of possible replicas
 		randval := rand.Intn(len(succVnodes))
@@ -105,18 +124,34 @@ func (kv KVStoreClientImpl) GetWithoutRetry(key string) ([]byte, error) {
 }
 
 /*
- * Basic KV store Set operation
- * TODO: Improve Godoc
+ * Inform the lock manager we're interested in setting the value for key.
+ * Expected return value: next available version number to write value to.
+ * Expected error conditions:
+ *   - Network failure     => Retryable failure
+ *   - Key does not exist  => Fail immediately
+ *   - Access permissions? => Fail immediately
+ *
+ * Once next version number has been successfully read, contact master
+ * KV Store to write value at new version.
+ * Expected error conditions:
+ *   - Key/version too old  => TODO: Inform lock manager
+ *   - Transient error      => TODO: Retry
+ *
+ * If write operation succeeded without errors, send a commit message to
+ * the lock manager to finalize the operation. Until the commit returns
+ * successfully, the new version of this value will not be advertised.
+ * Expected error conditions:
+ *   - Lock not found       => TODO: Return
+ *   - Transient error      => TODO: Retry
+ *
+ * If write operation failed, send an abort message to the lock manager to
+ * cancel the operation. This is simply to speed up the lock release operation
+ * instead of waiting for a timeout to happen.
+ * Expected error conditions:
+ *   - Lock not found       => TODO: Return
+ *   - Transient error      => TODO: Retry
  */
 func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
-	/*
-	 * Inform the lock manager we're interested in setting the value for key.
-	 * Expected return value: next available version number to write value to.
-	 * Expected error conditions:
-	 *   - Network failure     => Retryable failure
-	 *   - Key does not exist  => Fail immediately
-	 *   - Access permissions? => Fail immediately
-	 */
 	v, err := kv.lm.WLock(key, 0, 10)
 
 	// TODO: Inspect error and determine if we can retry the operation.
@@ -125,6 +160,17 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 		return err
 	}
 
+	return kv.SetVersion(key, v, value)
+}
+
+/*
+ * Similar to KVStore.Set, but useful for transactional read-update-write
+ * operations along with KVStore.GetForSet.
+ *
+ * Use the version number from the write lease acquired in KVStore.GetForSet.
+ * Perform regular Set operation with commit/abort.
+ */
+func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) error {
 	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
 		glog.Errorf("Error listing successors in Set(%q): %q", key, err)
@@ -142,19 +188,67 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 
 	// This request should always go to the master node.
 	// Replication happens at the master.
-	err = kv.ring.Transport().Set(succVnodes[0], key, v, value)
+	err = kv.ring.Transport().Set(succVnodes[0], key, version, value)
 
 	if err != nil {
-		glog.Errorf("Aborting Set(%q, %d) due to error: %q", key, v, err)
+		glog.Errorf("Aborting Set(%q, %d) due to error: %q", key, version, err)
 
 		// Best-effort Abort
-		kv.lm.AbortWLock(key, v)
+		kv.lm.AbortWLock(key, version)
 
 		// Even if the Abort command failed, we can safely return
 		// because the lock manager will timeout and abort for us.
 		return err
 	}
 
-	err = kv.lm.CommitWLock(key, v)
+	err = kv.lm.CommitWLock(key, version)
 	return err
+}
+
+/*
+ * Similar to KVStore.Get, but useful for transactional read-update-write
+ * operations along with KVStore.SetVersion.
+ *
+ * First, get a write lease from the lock manager. This prevents any
+ * further write operations on the same key. Proceed to read the latest
+ * version of the key and get its data, which is returned.
+ */
+func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, error) {
+	var err error = fmt.Errorf("DUMMY")
+	var val []byte
+	var version uint
+
+	for err != nil {
+		version, err = kv.lm.WLock(key, 0, 60)
+		if err == nil {
+			break
+		}
+
+		if !retry || !isRetryable(err) {
+			return nil, 0, err
+		}
+
+		// TODO: Use some kind of backoff mechanism, like in
+		//       https://github.com/cenkalti/backoff
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	err = fmt.Errorf("DUMMY")
+
+	for err != nil {
+		val, err = kv.getWithoutRetry(key)
+		if err == nil {
+			return val, version, nil
+		}
+
+		if !retry || !isRetryable(err) {
+			return nil, 0, err
+		}
+
+		// TODO: Use some kind of backoff mechanism, like in
+		//       https://github.com/cenkalti/backoff
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return nil, 0, fmt.Errorf("Code should note have reached here")
 }
