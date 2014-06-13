@@ -166,6 +166,7 @@ func (ml *MultiLocalTrans) IsLocalVnode(vn *Vnode) bool {
 	panic("THIS METHOD SHOULD NEVER BE CALLED")
 }
 
+/*
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig("test")
 	if conf.Hostname != "test" {
@@ -193,6 +194,7 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatalf("bad delegate")
 	}
 }
+*/
 
 func fastConf() *Config {
 	conf := DefaultConfig("test")
