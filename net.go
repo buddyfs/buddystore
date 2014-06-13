@@ -68,6 +68,7 @@ const (
 	tcpCommitWLockReq
 	tcpAbortWLockReq
 	tcpInvalidateRLockReq
+	tcpVersionMapUpdate
 	tcpJoinRingReq
 )
 
@@ -1164,12 +1165,31 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 			}
 
 			// Generate a response
-			obj := t.local[string(body.Vn.Id)]
+			obj, _ := t.get(body.Vn)
 			resp := tcpBodyLMInvalidateRLockResp{}
 			sendResp = &resp
 			if obj != nil {
-				_ = obj.obj.InvalidateRLock(body.LockID)
+				_ = obj.InvalidateRLock(body.LockID)
 				resp.SetError(nil) // Change it to incorporate the error from the client
+			} else {
+				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
+					body.Vn.Host, body.Vn.String()))
+			}
+
+		case tcpVersionMapUpdate:
+			body := tcpVersionMapUpdateReq{}
+			if err := dec.Decode(&body); err != nil {
+				glog.Errorf("Failed to decode TCP body! Got %s", err)
+				return
+			}
+
+			// Generate a response
+			obj, _ := t.get(body.Vn)
+			resp := tcpVersionMapUpdateResp{}
+			sendResp = &resp
+			if obj != nil {
+				obj.UpdateVersionMap(body.VersionMap)
+				resp.SetError(nil)
 			} else {
 				resp.SetError(fmt.Errorf("Target VN not found! Target %s:%s",
 					body.Vn.Host, body.Vn.String()))

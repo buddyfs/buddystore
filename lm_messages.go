@@ -79,3 +79,16 @@ type tcpBodyLMInvalidateRLockResp struct {
 	// Extends:
 	TCPResponseImpl
 }
+
+type tcpVersionMapUpdateReq struct {
+	Vn         *Vnode
+	VersionMap *map[string]uint
+
+	// Extends:
+	TCPResponseImpl
+}
+
+type tcpVersionMapUpdateResp struct {
+	// Extends:
+	TCPResponseImpl
+}

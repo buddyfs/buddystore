@@ -60,6 +60,10 @@ type LManager struct {
 	// HARP Replication
 	CommitPoint uint64 //  Current Commit point of LManager.
 	CommitIndex int
+
+	// For handling virtual ring joins
+	block             bool        // Set to true if the LM is not sure if it is the primary
+	cancelCheckStatus *time.Timer //  Used for cancelling the CheckStatus operation if we hear back from the original LockManager
 }
 
 /* Should be extensible to be used by any underlying storage implementation */
@@ -523,4 +527,31 @@ Return true, if the successor has state, else return false (birth)
 */
 func (lm *LManager) SyncWithSuccessor() bool {
 	return false
+}
+
+/* This method is called after JOIN_STABILIZE_WAIT time.
+1. Check if this lm is the CurrentLM, if yes, you should have received the current set of Locks from the original LockManager. In that case, we are ready to go. Set CurrentLM to true. Set block to false.
+2. If not the current LM, then just set block to false so that you can start acting as the secondary
+*/
+func (lm *LManager) CheckStatus() {
+	LMVnodes, err := lm.Ring.Lookup(1, []byte(lm.Ring.config.RingId))
+	if err != nil {
+		fmt.Println("Lookup for LockManager failed with error ", err)
+	}
+
+	if lm.Vn.String() == LMVnodes[0].String() {
+		fmt.Println("******* BLocking NodeID gets the LockManager status **********")
+		lm.CurrentLM = true
+	}
+	lm.block = false
+}
+
+/* Called by the old LM on the new LM to update it with the Locks */
+func (lm *LManager) UpdateVersionMap(versionMap *map[string]uint) {
+	fmt.Println("LM requested to update VersionMap with ", versionMap)
+	lm.verMapMut.Lock()
+	defer lm.verMapMut.Unlock()
+	for k, v := range *versionMap {
+		lm.VersionMap[k] = v
+	}
 }

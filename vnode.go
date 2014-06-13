@@ -217,33 +217,40 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 
 		// If there is a change in the predecessor, my LockManager status might change.
 		if vn.lm != nil && vn.lm.Ring != nil {
-			nearestNode := vn.lm.Ring.nearestVnode([]byte(vn.lm.Ring.config.RingId))
-			if nearestNode.successors[0] != nil {
-				if (vn.predecessor == nil && maybe_pred != nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0 {
-					LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
-					if err != nil {
-						fmt.Println("Lookup for LockManager failed with error ", err)
-					}
-
-					/* Once a lock manager starts operating, it should care about only two possibilies in terms of failure handling
-					   1. Node joining as its predecessor and becoming the LM
-					   2. Node dying before it and making it the LM or It just joined and found that it is the LM, in which case its opslog will be empty
-					*/
-					if vn.String() == LMVnodes[0].String() {
-						if vn.lm.CurrentLM {
-							// No-op
-						} else {
-							vn.lm.SyncWithSuccessor()
-							vn.lm.ReplayLog()
-							vn.lm.CurrentLM = true
+			if !vn.lm.block { // If you are supposed to be blocking, do not start any activity yet
+				nearestNode := vn.lm.Ring.nearestVnode([]byte(vn.lm.Ring.config.RingId))
+				if nearestNode.successors[0] != nil {
+					if (vn.predecessor == nil && maybe_pred != nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0 {
+						LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
+						if err != nil {
+							fmt.Println("Lookup for LockManager failed with error ", err)
 						}
-					} else {
-						if vn.lm.CurrentLM {
-							fmt.Println("Lost LockManager status")
-							// Keep Calm and handle requests. You will eventually get a getLockOps call from the new LM
-							vn.lm.CurrentLM = false
+
+						/* Once a lock manager starts operating, it should care about only two possibilies in terms of failure handling
+						   1. Node joining as its predecessor and becoming the LM
+						   2. Node dying before it and making it the LM or It just joined and found that it is the LM, in which case its opslog will be empty
+						*/
+						if vn.String() == LMVnodes[0].String() {
+							if vn.lm.CurrentLM {
+								// No-op
+							} else {
+								vn.lm.SyncWithSuccessor()
+								vn.lm.ReplayLog()
+								vn.lm.CurrentLM = true
+							}
 						} else {
-							// No-op
+							if vn.lm.CurrentLM {
+								fmt.Println("Lost LockManager status, sending Lock context to current LM")
+								resp := tcpVersionMapUpdateResp{}
+								err := vn.ring.transport.(*LocalTransport).remote.(*TCPTransport).networkCall(LMVnodes[0].Host, tcpVersionMapUpdate, tcpVersionMapUpdateReq{Vn: LMVnodes[0], VersionMap: &vn.lm.VersionMap}, &resp)
+
+								if err != nil {
+									fmt.Errorf("Error while trying to provide Lock context to the new LockManager : ", err)
+								}
+								vn.lm.CurrentLM = false
+							} else {
+								// No-op
+							}
 						}
 					}
 				}
@@ -498,6 +505,11 @@ func (vn *localVnode) InvalidateRLock(lockID string) error {
 func (vn *localVnode) AbortWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error) {
 	cp, err := vn.lm.abortWLock(key, version, nodeID, opsLogEntry)
 	return cp, err
+}
+
+func (vn *localVnode) UpdateVersionMap(versionMap *map[string]uint) {
+	vn.lm.UpdateVersionMap(versionMap)
+	return
 }
 
 func (vn *localVnode) Get(key string, version uint) ([]byte, error) {

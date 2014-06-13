@@ -28,6 +28,29 @@ func (r *Ring) init(conf *Config, trans Transport) {
 	sort.Sort(r)
 }
 
+/* Initialize the LManager with the block flag set to true */
+func (r *Ring) initBlockingLM(conf *Config, trans Transport) {
+	// Set our variables
+	r.config = conf
+	r.vnodes = make([]*localVnode, conf.NumVnodes)
+	r.transport = InitLocalTransport(trans)
+	r.delegateCh = make(chan func(), 32)
+
+	// Initializes the vnodes
+	for i := 0; i < conf.NumVnodes; i++ {
+		vn := &localVnode{}
+		vn.lm = &LManager{Vn: &vn.Vnode, OpsLog: make([]*OpsLogEntry, 0), CommitPoint: 0, CommitIndex: -1, block: true}
+		vn.lm.Ring = r // Because the LockManager needs to access transport for Cache Invalidation
+		vn.lm_client = &LManagerClient{Vnode: &vn.Vnode, Ring: r, RLocks: make(map[string]*RLockVal), WLocks: make(map[string]*WLockVal)}
+		r.vnodes[i] = vn
+		vn.ring = r
+		vn.init(i)
+	}
+
+	// Sort the vnodes
+	sort.Sort(r)
+}
+
 // Len is the number of vnodes
 func (r *Ring) Len() int {
 	return len(r.vnodes)

@@ -13,6 +13,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const JOIN_STABILIZE_WAIT = 5
+
 // Implements the methods needed for a Chord ring
 type Transport interface {
 	// Gets a list of the vnodes on the box
@@ -92,6 +94,7 @@ type VnodeRPC interface {
 	AbortWLock(key string, version uint, nodeID string, opsLogEntry *OpsLogEntry) (uint64, error)
 	InvalidateRLock(lockID string) error
 	CheckWLock(key string) (bool, uint, error)
+	UpdateVersionMap(versionMap *map[string]uint)
 
 	// Tracker operations
 	JoinRing(ringId string, self *Vnode) ([]*Vnode, error)
@@ -272,6 +275,58 @@ func Join(conf *Config, trans Transport, existing string) (*Ring, error) {
 	// Do a fast stabilization, will schedule regular execution
 	for _, vn := range ring.vnodes {
 		vn.stabilize()
+	}
+	return ring, nil
+}
+
+/* BlockingJoin. Called by the buddynode that wants to block all operations until the network is healed.
+Reason : All its operations should happen in its namespace. And its namespace i.e. the ring, specicifically the bootstrap members are present in the original ring
+*/
+func BlockingJoin(conf *Config, trans Transport, existing string) (*Ring, error) {
+	// Initialize the hash bits
+	conf.hashBits = conf.HashFunc().Size() * 8
+
+	// Request a list of Vnodes from the remote host
+	hosts, err := trans.ListVnodes(existing)
+	if err != nil {
+		return nil, err
+	}
+	if hosts == nil || len(hosts) == 0 {
+		return nil, fmt.Errorf("Remote host has no vnodes!")
+	}
+
+	if glog.V(2) {
+		glog.Infof("Fetched hosts: %s", hosts)
+	}
+
+	// Create a ring
+	ring := &Ring{}
+	ring.initBlockingLM(conf, trans)
+
+	// Acquire a live successor for each Vnode
+	for _, vn := range ring.vnodes {
+		// Get the nearest remote vnode
+		nearest := nearestVnodeToKey(hosts, vn.Id)
+
+		// Query for a list of successors to this Vnode
+		succs, err := trans.FindSuccessors(nearest, conf.NumSuccessors, vn.Id)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to find successor for vnodes! Got %s", err)
+		}
+		if succs == nil || len(succs) == 0 {
+			return nil, fmt.Errorf("Failed to find successor for vnodes! Got no vnodes!")
+		}
+
+		// Assign the successors
+		for idx, s := range succs {
+			vn.successors[idx] = s
+		}
+	}
+
+	// Do a fast stabilization, will schedule regular execution
+	for _, vn := range ring.vnodes {
+		vn.stabilize()
+		vn.lm.cancelCheckStatus = time.AfterFunc(JOIN_STABILIZE_WAIT*time.Second, vn.lm.CheckStatus)
 	}
 	return ring, nil
 }
