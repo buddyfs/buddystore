@@ -92,7 +92,11 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 
 	for i, vnode := range succVnodes {
 		if kv.ring.Transport().IsLocalVnode(vnode) {
-			succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
+			if i < len(succVnodes)-1 {
+				succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
+			} else {
+				copy(succVnodes, succVnodes[:i])
+			}
 			value, err := kv.ring.Transport().Get(vnode, key, v)
 			// fmt.Printf("GetSubLocal(key, vnode) => %s [Err: %s]\n", value, err)
 

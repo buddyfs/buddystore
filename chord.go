@@ -204,8 +204,8 @@ func DefaultConfig(hostname string) *Config {
 		hostname,
 		8,        // 8 vnodes
 		sha1.New, // SHA1
+		time.Duration(5 * time.Second),
 		time.Duration(15 * time.Second),
-		time.Duration(45 * time.Second),
 		8,   // 8 successors
 		nil, // No delegate
 		160, // 160bit hash function
