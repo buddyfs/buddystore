@@ -9,7 +9,6 @@ var i uint = 10000
 
 /* Execute these benchmarks separately for graphing purposes */
 func BenchmarkRead_NoReplica(b *testing.B) {
-	fmt.Println("Running", b.N)
 	var listen string = fmt.Sprintf("localhost:%d", i)
 	i++
 	trans, err := InitTCPTransport(listen, timeout)
@@ -29,7 +28,6 @@ func BenchmarkRead_NoReplica(b *testing.B) {
 }
 
 func BenchmarkWriteAndCommit_NoReplica(b *testing.B) {
-	fmt.Println("Running", b.N)
 	var listen string = fmt.Sprintf("localhost:%d", i)
 	i++
 	trans, err := InitTCPTransport(listen, timeout)

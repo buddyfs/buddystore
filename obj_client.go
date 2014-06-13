@@ -231,7 +231,7 @@ func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, err
 		}
 
 		if !retry || !isRetryable(err) {
-			return nil, 0, err
+			return nil, version, err
 		}
 
 		// TODO: Use some kind of backoff mechanism, like in
@@ -248,7 +248,7 @@ func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, err
 		}
 
 		if !retry || !isRetryable(err) {
-			return nil, 0, err
+			return nil, version, err
 		}
 
 		// TODO: Use some kind of backoff mechanism, like in

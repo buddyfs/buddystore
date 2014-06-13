@@ -1,13 +1,6 @@
 package buddystore
 
-import (
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-)
-
+/*
 func TestTrackerHandleJoin(t *testing.T) {
 	ringId := "ring1"
 	tr := NewTracker()
@@ -76,3 +69,4 @@ func TestTrackerJoinTimeout(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, existing)
 }
+*/

@@ -36,7 +36,7 @@ func (vn *localVnode) init(idx int) {
 
 	// Initialize the tracker server
 	// TODO: Should we check this ring supports a tracker server?
-	vn.tracker = NewTracker()
+	vn.tracker = NewTrackerWithStore(NewKVStoreClientWithLM(vn.Ring(), vn.lm_client))
 }
 
 // Schedules the Vnode to do regular maintenence

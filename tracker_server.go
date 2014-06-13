@@ -2,6 +2,7 @@ package buddystore
 
 import (
 	"container/heap"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -84,9 +85,16 @@ type TrackerImpl struct {
 	lock         sync.Mutex
 	timer        *time.Timer
 	clock        ClockIface
+	kvClient     KVStoreClient
 
 	// Implements:
 	Tracker
+}
+
+func NewTrackerWithClockAndStore(clock ClockIface, kvClient KVStoreClient) Tracker {
+	pq := &TimeoutQueue{}
+	heap.Init(pq)
+	return &TrackerImpl{lock: sync.Mutex{}, ringMembers: make(map[string][]*Vnode), timeoutQueue: pq, clock: clock, kvClient: kvClient}
 }
 
 func NewTrackerWithClock(clock ClockIface) Tracker {
@@ -95,15 +103,15 @@ func NewTrackerWithClock(clock ClockIface) Tracker {
 	return &TrackerImpl{lock: sync.Mutex{}, ringMembers: make(map[string][]*Vnode), timeoutQueue: pq, clock: clock}
 }
 
+func NewTrackerWithStore(store KVStoreClient) Tracker {
+	return NewTrackerWithClockAndStore(new(RealClock), store)
+}
+
 func NewTracker() Tracker {
 	return NewTrackerWithClock(new(RealClock))
 }
 
-func (tr *TrackerImpl) handleTimer() {
-	tr.lock.Lock()
-	defer tr.lock.Unlock()
-	defer tr.rescheduleTimer()
-
+func (tr *TrackerImpl) purgeHeadofQueueIfStale() {
 	head := tr.timeoutQueue.Peek()
 
 	if head == nil {
@@ -113,7 +121,7 @@ func (tr *TrackerImpl) handleTimer() {
 	nextTimer := head.priority
 	now := tr.clock.Now()
 
-	if now.After(nextTimer) {
+	for now.After(nextTimer) {
 		stale := tr.timeoutQueue.Pop()
 		item := stale.(*TimeoutItem)
 
@@ -129,6 +137,14 @@ func (tr *TrackerImpl) handleTimer() {
 		members = append(members[:posn], members[posn+1:]...)
 		tr.ringMembers[item.ringId] = members
 	}
+}
+
+func (tr *TrackerImpl) handleTimer() {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+	defer tr.rescheduleTimer()
+
+	tr.purgeHeadofQueueIfStale()
 }
 
 func (tr *TrackerImpl) rescheduleTimer() {
@@ -188,5 +204,28 @@ func (tr *TrackerImpl) handleJoinRingWithTimeout(ringId string, joiner *Vnode, t
 }
 
 func (tr *TrackerImpl) handleJoinRing(ringId string, joiner *Vnode) ([]*Vnode, error) {
-	return tr.handleJoinRingWithTimeout(ringId, joiner, TRACKER_TIMEOUT_SECS)
+	val, version, err := tr.kvClient.GetForSet(ringId, true)
+
+	var nodesInRing []*Vnode
+	var newNodesInRing []*Vnode
+
+	if err != nil {
+		glog.Errorf("Unable to get current tracker status")
+		nodesInRing = []*Vnode{}
+	} else {
+		json.Unmarshal(val, nodesInRing)
+	}
+
+	newNodesInRing = append(nodesInRing, joiner)
+
+	writeBack, err := json.Marshal(newNodesInRing)
+
+	if err != nil {
+		glog.Errorf("Marshalling error: %s", err)
+		return nil, err
+	}
+
+	tr.kvClient.SetVersion(ringId, version, writeBack)
+
+	return nodesInRing, nil
 }
