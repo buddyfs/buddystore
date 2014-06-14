@@ -232,11 +232,11 @@ func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 	t.poolLock.Unlock()
 	if out != nil {
 		// Verify that the socket is valid. Might be closed.
-		if _, err := out.sock.Read(nil); err == nil {
-			return out, nil
-		} else {
-			out.sock.Close()
-		}
+		//if _, err := out.sock.Read(nil); err == nil {
+		return out, nil
+		//} else {
+		//	out.sock.Close()
+		//}
 	}
 
 	// Try to establish a connection
