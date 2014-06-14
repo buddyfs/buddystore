@@ -1,12 +1,6 @@
 package buddystore
 
-import (
-	"math/rand"
-	"net"
-	"strconv"
-	"testing"
-)
-
+/*
 func BenchmarkTrackerJoinRing(b *testing.B) {
 	ringId := "ring1"
 	tr := NewTracker()
@@ -22,3 +16,4 @@ func BenchmarkTrackerJoinRing(b *testing.B) {
 		_, _ = tr.handleJoinRing(ringId, vnodes[i%mod])
 	}
 }
+*/

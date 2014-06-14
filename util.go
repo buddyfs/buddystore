@@ -148,6 +148,10 @@ func GetLocalExternalAddresses() (localAddr string, externalAddr string) {
 }
 
 func CreateNewTCPTransport(localOnly bool) (int, Transport, *Config) {
+	return CreateNewTCPTransportWithConfig(localOnly, DefaultConfig)
+}
+
+func CreateNewTCPTransportWithConfig(localOnly bool, configGen func(string) *Config) (int, Transport, *Config) {
 	var localAddr, externalAddr string
 
 	var transport Transport
@@ -179,7 +183,7 @@ func CreateNewTCPTransport(localOnly bool) (int, Transport, *Config) {
 		externalAddr = "localhost"
 	}
 
-	conf := DefaultConfig(listen)
+	conf := configGen(listen)
 	if len(externalAddr) > 0 {
 		conf.Hostname = net.JoinHostPort(externalAddr, strconv.Itoa(port))
 	} else {

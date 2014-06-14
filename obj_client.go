@@ -8,6 +8,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const RETRY_WAIT = 1 * time.Millisecond
+
 type KVStoreClient interface {
 	Get(key string, retry bool) ([]byte, error)
 	Set(key string, val []byte) error
@@ -61,7 +63,7 @@ func (kv KVStoreClientImpl) Get(key string, retry bool) ([]byte, error) {
 
 		// TODO: Use some kind of backoff mechanism, like in
 		//       https://github.com/cenkalti/backoff
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(RETRY_WAIT)
 	}
 
 	return val, nil
@@ -171,7 +173,7 @@ func (kv *KVStoreClientImpl) Set(key string, value []byte) error {
 
 		// TODO: Use some kind of backoff mechanism, like in
 		//       https://github.com/cenkalti/backoff
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(RETRY_WAIT)
 	}
 
 	return kv.SetVersion(key, v, value)
@@ -198,7 +200,7 @@ func (kv *KVStoreClientImpl) SetVersion(key string, version uint, value []byte) 
 
 		// TODO: Use some kind of backoff mechanism, like in
 		//       https://github.com/cenkalti/backoff
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(RETRY_WAIT)
 	}
 
 	// TODO: Unreachable code
@@ -263,7 +265,7 @@ func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, err
 
 		// TODO: Use some kind of backoff mechanism, like in
 		//       https://github.com/cenkalti/backoff
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(RETRY_WAIT)
 	}
 
 	err = fmt.Errorf("DUMMY")
@@ -280,7 +282,7 @@ func (kv KVStoreClientImpl) GetForSet(key string, retry bool) ([]byte, uint, err
 
 		// TODO: Use some kind of backoff mechanism, like in
 		//       https://github.com/cenkalti/backoff
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(RETRY_WAIT)
 	}
 
 	return nil, 0, fmt.Errorf("Code should note have reached here")
