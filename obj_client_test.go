@@ -136,7 +136,7 @@ func TestKVGetExistingKeyWithFallbackToRemoteNode(t *testing.T) {
 	tr.On("IsLocalVnode", vnode1).Return(false)
 	tr.On("IsLocalVnode", vnode2).Return(true)
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
-	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
+	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error"))
 
 	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Equal(t, TEST_VALUE, v)
@@ -163,7 +163,7 @@ func TestKVGetWithRetryableErrors(t *testing.T) {
 	tr.On("IsLocalVnode", vnode2).Return(true)
 
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
-	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
+	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error"))
 
 	v, err := kvsClient.Get(TEST_KEY, true)
 	assert.Equal(t, TEST_VALUE, v)
