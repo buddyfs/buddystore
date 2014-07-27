@@ -22,7 +22,7 @@ func CreateKVClientWithMocks() (*MockTransport, *MockRing, *MockLM, KVStoreClien
 	return t, r, lm, kvsClient
 }
 
-func TestKVGetNonExistentKey(t *testing.T) {
+func TestKVClientGetNonExistentKey(t *testing.T) {
 	_, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	lm.On("RLock", TEST_KEY, false).Return(0, fmt.Errorf("Key not found")).Once()
@@ -35,7 +35,7 @@ func TestKVGetNonExistentKey(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
+func TestKVClientGetExistingKeyWithRingErrors(t *testing.T) {
 	_, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	lm.On("RLock", TEST_KEY, false).Return(1, nil).Once()
@@ -59,7 +59,7 @@ func TestKVGetExistingKeyWithRingErrors(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithAllNodeReadsFailing(t *testing.T) {
+func TestKVClientGetExistingKeyWithAllNodeReadsFailing(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -80,7 +80,7 @@ func TestKVGetExistingKeyWithAllNodeReadsFailing(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithSomeNodeReadsFailing(t *testing.T) {
+func TestKVClientGetExistingKeyWithSomeNodeReadsFailing(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -104,7 +104,7 @@ func TestKVGetExistingKeyWithSomeNodeReadsFailing(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithLocalNodeProritized(t *testing.T) {
+func TestKVClientGetExistingKeyWithLocalNodeProritized(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -125,7 +125,7 @@ func TestKVGetExistingKeyWithLocalNodeProritized(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithFallbackToRemoteNode(t *testing.T) {
+func TestKVClientGetExistingKeyWithFallbackToRemoteNode(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -136,7 +136,7 @@ func TestKVGetExistingKeyWithFallbackToRemoteNode(t *testing.T) {
 	tr.On("IsLocalVnode", vnode1).Return(false)
 	tr.On("IsLocalVnode", vnode2).Return(true)
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
-	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error"))
+	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 
 	v, err := kvsClient.Get(TEST_KEY, false)
 	assert.Equal(t, TEST_VALUE, v)
@@ -147,7 +147,7 @@ func TestKVGetExistingKeyWithFallbackToRemoteNode(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetWithRetryableErrors(t *testing.T) {
+func TestKVClientGetWithRetryableErrors(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -163,7 +163,7 @@ func TestKVGetWithRetryableErrors(t *testing.T) {
 	tr.On("IsLocalVnode", vnode2).Return(true)
 
 	tr.On("Get", vnode1, TEST_KEY, uint(1)).Return([]byte(TEST_VALUE), nil).Once()
-	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error"))
+	tr.On("Get", vnode2, TEST_KEY, uint(1)).Return(nil, fmt.Errorf("Node read error")).Once()
 
 	v, err := kvsClient.Get(TEST_KEY, true)
 	assert.Equal(t, TEST_VALUE, v)
@@ -174,7 +174,7 @@ func TestKVGetWithRetryableErrors(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
+func TestKVClientGetExistingKeyWithoutErrors(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	vnode1 := &Vnode{Id: []byte("abcdef"), Host: "vnode1"}
@@ -197,7 +197,7 @@ func TestKVGetExistingKeyWithoutErrors(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVSetWriteLockedKey(t *testing.T) {
+func TestKVClientSetWriteLockedKey(t *testing.T) {
 	_, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	bar := []byte("bar")
@@ -211,7 +211,7 @@ func TestKVSetWriteLockedKey(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVSetWithRingErrors(t *testing.T) {
+func TestKVClientSetWithRingErrors(t *testing.T) {
 	_, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	bar := []byte("bar")
@@ -235,7 +235,7 @@ func TestKVSetWithRingErrors(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVSetAndAbort(t *testing.T) {
+func TestKVClientSetAndAbort(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	bar := []byte("bar")
@@ -260,7 +260,7 @@ func TestKVSetAndAbort(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVSetAndCommitFailed(t *testing.T) {
+func TestKVClientSetAndCommitFailed(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	bar := []byte("bar")
@@ -281,7 +281,7 @@ func TestKVSetAndCommitFailed(t *testing.T) {
 	lm.AssertExpectations(t)
 }
 
-func TestKVSetAndCommitSucceeded(t *testing.T) {
+func TestKVClientSetAndCommitSucceeded(t *testing.T) {
 	tr, r, lm, kvsClient := CreateKVClientWithMocks()
 
 	bar := []byte("bar")
