@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"hash"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -191,11 +192,13 @@ type RingIntf interface {
 
 // Stores the state required for a Chord ring
 type Ring struct {
-	config     *Config
-	transport  Transport
-	vnodes     []*localVnode
-	delegateCh chan func()
-	shutdown   chan bool
+	config            *Config
+	transport         Transport
+	vnodes            []*localVnode
+	delegateCh        chan func()
+	shutdownComplete  chan bool
+	shutdownRequested bool
+	shutdownLock      sync.Mutex
 
 	// Implements:
 	RingIntf

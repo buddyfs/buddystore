@@ -12,6 +12,8 @@ func (r *Ring) init(conf *Config, trans Transport) {
 	r.vnodes = make([]*localVnode, conf.NumVnodes)
 	r.transport = InitLocalTransport(trans)
 	r.delegateCh = make(chan func(), 32)
+	r.shutdownRequested = false
+	r.shutdownComplete = make(chan bool, r.config.NumVnodes)
 
 	// Initializes the vnodes
 	for i := 0; i < conf.NumVnodes; i++ {
@@ -88,11 +90,27 @@ func (r *Ring) schedule() {
 	}
 }
 
+// Signal that the ring is being shut down.
+func (r *Ring) requestShutdown() {
+	defer r.shutdownLock.Unlock()
+	r.shutdownLock.Lock()
+
+	r.shutdownRequested = true
+}
+
+// Check if the ring is being shut down.
+func (r *Ring) isBeingShutdown() bool {
+	defer r.shutdownLock.Unlock()
+	r.shutdownLock.Lock()
+
+	return r.shutdownRequested
+}
+
 // Wait for all the vnodes to shutdown
 func (r *Ring) stopVnodes() {
-	r.shutdown = make(chan bool, r.config.NumVnodes)
+	r.requestShutdown()
 	for i := 0; i < r.config.NumVnodes; i++ {
-		<-r.shutdown
+		<-r.shutdownComplete
 	}
 }
 

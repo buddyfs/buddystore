@@ -18,6 +18,8 @@ func makeVnode() *localVnode {
 		HashFunc:      sha1.New}
 	trans := InitLocalTransport(nil)
 	ring := &Ring{config: conf, transport: trans}
+	// TODO: Remove this hack - make this part of ring initialization.
+	ring.shutdownComplete = make(chan bool, conf.NumSuccessors)
 	return &localVnode{ring: ring}
 }
 
@@ -66,7 +68,7 @@ func TestGenId(t *testing.T) {
 func TestVnodeStabilizeShutdown(t *testing.T) {
 	vn := makeVnode()
 	vn.schedule()
-	vn.ring.shutdown = make(chan bool, 1)
+	vn.ring.requestShutdown()
 	vn.stabilize()
 
 	if vn.timer != nil {
@@ -76,7 +78,7 @@ func TestVnodeStabilizeShutdown(t *testing.T) {
 		t.Fatalf("unexpected time")
 	}
 	select {
-	case <-vn.ring.shutdown:
+	case <-vn.ring.shutdownComplete:
 		return
 	default:
 		t.Fatalf("expected message")
