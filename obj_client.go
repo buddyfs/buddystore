@@ -83,10 +83,6 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	if glog.V(5) {
-		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
-	}
-
 	if len(succVnodes) == 0 {
 		glog.Errorf("No successors found during Lookup in Get(%q)", key)
 		return nil, fmt.Errorf("No Successors found")
@@ -213,10 +209,6 @@ func (kv *KVStoreClientImpl) setVersionWithoutRetry(key string, version uint, va
 	if len(succVnodes) == 0 {
 		glog.Errorf("No successors found during Lookup in Get(%q)", key)
 		return fmt.Errorf("No Successors found")
-	}
-
-	if glog.V(5) {
-		glog.Infof("Successfully looked up list of successors: %q", succVnodes)
 	}
 
 	// This request should always go to the master node.
