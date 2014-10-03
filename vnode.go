@@ -42,6 +42,8 @@ func (vn *localVnode) init(idx int) {
 // Schedules the Vnode to do regular maintenence
 func (vn *localVnode) schedule() {
 	// Setup our stabilize timer
+	defer vn.timerLock.Unlock()
+	vn.timerLock.Lock()
 	vn.timer = time.AfterFunc(randStabilize(vn.ring.config), vn.stabilize)
 }
 
@@ -57,10 +59,16 @@ func (vn *localVnode) genId(idx uint16) {
 	vn.Id = hash.Sum(nil)
 }
 
+// Clear reschedule timer
+func (vn *localVnode) clearTimer() {
+	defer vn.timerLock.Unlock()
+	vn.timerLock.Lock()
+	vn.timer = nil
+}
+
 // Called to periodically stabilize the vnode
 func (vn *localVnode) stabilize() {
-	// Clear the timer
-	vn.timer = nil
+	vn.clearTimer()
 
 	// Check for shutdown
 	if vn.ring.isBeingShutdown() {

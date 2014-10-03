@@ -150,6 +150,7 @@ type localVnode struct {
 	predecessor  *Vnode
 	stabilized   time.Time
 	timer        *time.Timer
+	timerLock    sync.Mutex
 	store        *KVStore
 	lm           *LManager
 	lm_client    *LManagerClient
