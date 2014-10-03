@@ -139,6 +139,10 @@ func (r *Ring) setLocalPredecessors() {
 	numV := len(r.vnodes)
 	numPred := min(r.config.NumSuccessors+1, numV-1)
 	for idx, vnode := range r.vnodes {
+		// TODO: Consider creating a local list and atomically updating predecessors
+		// list.
+		vnode.predecessorLock.Lock()
+
 		for i := 0; i < numPred; i++ {
 			if (idx - i - 1) < 0 {
 				vnode.predecessors[i] = &r.vnodes[numV-i-1].Vnode
@@ -146,6 +150,8 @@ func (r *Ring) setLocalPredecessors() {
 				vnode.predecessors[i] = &r.vnodes[idx-i-1].Vnode
 			}
 		}
+
+		vnode.predecessorLock.Unlock()
 	}
 }
 

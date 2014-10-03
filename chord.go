@@ -142,19 +142,20 @@ type localVnodeIface interface {
 // Represents a local Vnode
 type localVnode struct {
 	Vnode
-	ring         *Ring
-	successors   []*Vnode
-	predecessors []*Vnode
-	finger       []*Vnode
-	last_finger  int
-	predecessor  *Vnode
-	stabilized   time.Time
-	timer        *time.Timer
-	timerLock    sync.Mutex
-	store        *KVStore
-	lm           *LManager
-	lm_client    *LManagerClient
-	tracker      Tracker
+	ring            *Ring
+	successors      []*Vnode
+	predecessors    []*Vnode
+	finger          []*Vnode
+	last_finger     int
+	predecessor     *Vnode
+	predecessorLock sync.RWMutex
+	stabilized      time.Time
+	timer           *time.Timer
+	timerLock       sync.Mutex
+	store           *KVStore
+	lm              *LManager
+	lm_client       *LManagerClient
+	tracker         Tracker
 
 	// Implements:
 	localVnodeIface
@@ -167,9 +168,15 @@ func (lvn *localVnode) Successors() []*Vnode {
 	return lvn.successors
 }
 func (lvn *localVnode) Predecessors() []*Vnode {
+	defer lvn.predecessorLock.RUnlock()
+	lvn.predecessorLock.RLock()
+
 	return lvn.predecessors
 }
 func (lvn *localVnode) Predecessor() *Vnode {
+	defer lvn.predecessorLock.RUnlock()
+	lvn.predecessorLock.RLock()
+
 	return lvn.predecessor
 }
 func (lvn *localVnode) localVnodeId() []byte {

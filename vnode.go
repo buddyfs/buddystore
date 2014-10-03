@@ -104,6 +104,12 @@ func (vn *localVnode) stabilize() {
 		log.Printf("[ERR] Error updating predecessor list: %s", err)
 	}
 
+	// Locking predecessors because we're passing predecessors by reference.
+	// TODO: Make a copy of predecessors and successors here and reduce scope of
+	// lock.
+	defer vn.predecessorLock.RUnlock()
+	vn.predecessorLock.RLock()
+
 	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
 
 	go vn.store.localRepl()
@@ -164,12 +170,16 @@ CHECK_NEW_SUC:
 
 // RPC: Invoked to return out predecessor
 func (vn *localVnode) GetPredecessor() (*Vnode, error) {
+	defer vn.predecessorLock.RUnlock()
+	vn.predecessorLock.RLock()
+
 	return vn.predecessor, nil
 }
 
-// RPC: Invoked to return out predecessor list
+// RPC Short Circuit: Return predecessor list
+// Must be called with predecessorLock held
+// TODO: Is there a way to assert that the lock is held?
 func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
-
 	var retPredList []*Vnode
 
 	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors+1)
@@ -214,6 +224,9 @@ func (vn *localVnode) notifySuccessor() error {
 
 // RPC: Notify is invoked when a Vnode gets notified
 func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
+	defer vn.predecessorLock.Unlock()
+	vn.predecessorLock.Lock()
+
 	// Check if we should update our predecessor
 	if vn.predecessor == nil || between(vn.predecessor.Id, vn.Id, maybe_pred.Id) {
 		// Inform the delegate
@@ -317,6 +330,9 @@ func (vn *localVnode) fixFingerTable() error {
 
 // Checks the health of our predecessor
 func (vn *localVnode) checkPredecessor() error {
+	defer vn.predecessorLock.Unlock()
+	vn.predecessorLock.Lock()
+
 	// Check predecessor
 	if vn.predecessor != nil {
 		res, err := vn.ring.transport.Ping(vn.predecessor)
@@ -335,6 +351,9 @@ func (vn *localVnode) checkPredecessor() error {
 
 // Update the predecessor list
 func (vn *localVnode) updatePredecessorList() error {
+	defer vn.predecessorLock.Unlock()
+	vn.predecessorLock.Lock()
+
 	if vn.predecessor != nil {
 		pred_list, err := vn.ring.transport.GetPredecessorList(vn.predecessor)
 		if err != nil {
@@ -409,6 +428,9 @@ func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 
 // Instructs the vnode to leave
 func (vn *localVnode) leave() error {
+	defer vn.predecessorLock.RUnlock()
+	vn.predecessorLock.RLock()
+
 	// Inform the delegate we are leaving
 	conf := vn.ring.config
 	pred := vn.predecessor
