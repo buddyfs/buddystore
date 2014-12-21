@@ -27,6 +27,8 @@ func (cp *closestPreceedingVnodeIterator) Next() *Vnode {
 
 	// Scan to find the next successor
 	vn := cp.vn
+	defer vn.fingerLock.RUnlock()
+	vn.fingerLock.RLock()
 	var i int
 	for i = cp.successor_idx; i >= 0; i-- {
 		if vn.successors[i] == nil {
@@ -35,10 +37,18 @@ func (cp *closestPreceedingVnodeIterator) Next() *Vnode {
 		if _, ok := cp.yielded[vn.successors[i].String()]; ok {
 			continue
 		}
+
+		vn.fullLock.RLock()
+		vn.successors[i].fullLock.RLock()
+
 		if between(vn.Id, cp.key, vn.successors[i].Id) {
 			successor_node = vn.successors[i]
+			vn.fullLock.RUnlock()
+			vn.successors[i].fullLock.RUnlock()
 			break
 		}
+		vn.fullLock.RUnlock()
+		vn.successors[i].fullLock.RUnlock()
 	}
 	cp.successor_idx = i
 

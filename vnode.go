@@ -184,6 +184,9 @@ func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
 
 	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors+1)
 
+	defer vn.predecessorLock.Unlock()
+	vn.predecessorLock.Lock()
+
 	for i := 0; i < vn.ring.config.NumSuccessors+1; i++ {
 		if vn.predecessors[i] != nil {
 			retPredList = append(retPredList, vn.predecessors[i])
@@ -196,7 +199,9 @@ func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
 // Notifies our successor of us, updates successor list
 func (vn *localVnode) notifySuccessor() error {
 	// Notify successor
+	vn.successorsLock.RLock()
 	succ := vn.successors[0]
+	vn.successorsLock.RUnlock()
 	succ_list, err := vn.ring.transport.Notify(succ, &vn.Vnode)
 	if err != nil {
 		return err
@@ -217,7 +222,9 @@ func (vn *localVnode) notifySuccessor() error {
 		if s == nil || s.String() == vn.String() {
 			break
 		}
+		vn.successorsLock.Lock()
 		vn.successors[idx+1] = s
+		vn.successorsLock.Unlock()
 	}
 	return nil
 }
@@ -282,7 +289,9 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 	}
 
 	// Return our successors list
-	return vn.successors, nil
+	succ_list := make([]*Vnode, len(vn.successors))
+	copy(succ_list, vn.successors)
+	return succ_list, nil
 }
 
 // Fixes up the finger table
@@ -298,6 +307,8 @@ func (vn *localVnode) fixFingerTable() error {
 	}
 	node := nodes[0]
 
+	defer vn.fingerLock.Unlock()
+	vn.fingerLock.Lock()
 	// Update the finger table
 	vn.finger[vn.last_finger] = node
 
@@ -385,6 +396,10 @@ func (vn *localVnode) updatePredecessorList() error {
 // Finds next N successors. N must be <= NumSuccessors
 func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 	// Check if we are the immediate predecessor
+
+	vn.successorsLock.RLock()
+	defer vn.successorsLock.RUnlock()
+
 	if betweenRightIncl(vn.Id, vn.successors[0].Id, key) {
 		return vn.successors[:n], nil
 	}

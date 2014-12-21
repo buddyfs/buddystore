@@ -217,27 +217,31 @@ func (t *TCPTransport) get(vn *Vnode) (VnodeRPC, bool) {
 // Gets an outbound connection to a host
 func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 	// Check if we have a conn cached
-	var out *tcpOutConn
-	t.poolLock.Lock()
+	// var out *tcpOutConn
+	// t.poolLock.Lock()
 	if atomic.LoadInt32(&t.shutdown) == 1 {
-		t.poolLock.Unlock()
+		// t.poolLock.Unlock()
 		return nil, fmt.Errorf("TCP transport is shutdown")
 	}
-	list, ok := t.pool[host]
-	if ok && len(list) > 0 {
-		out = list[len(list)-1]
-		list = list[:len(list)-1]
-		t.pool[host] = list
-	}
-	t.poolLock.Unlock()
-	if out != nil {
-		// Verify that the socket is valid. Might be closed.
-		//if _, err := out.sock.Read(nil); err == nil {
-		return out, nil
-		//} else {
-		//	out.sock.Close()
-		//}
-	}
+
+	/*
+		list, ok := t.pool[host]
+		if ok && len(list) > 0 {
+			out = list[len(list)-1]
+			list = list[:len(list)-1]
+			t.pool[host] = list
+		}
+		t.poolLock.Unlock()
+
+			if out != nil {
+				// Verify that the socket is valid. Might be closed.
+				//if _, err := out.sock.Read(nil); err == nil {
+				return out, nil
+				//} else {
+				//	out.sock.Close()
+				//}
+			}
+	*/
 
 	// Try to establish a connection
 	conn, err := net.DialTimeout("tcp", host, t.timeout)
@@ -253,8 +257,7 @@ func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 	now := time.Now()
 
 	// Wrap the sock
-	out = &tcpOutConn{host: host, sock: sock, enc: enc, dec: dec, used: now}
-	return out, nil
+	return &tcpOutConn{host: host, sock: sock, enc: enc, dec: dec, used: now}, nil
 }
 
 // Returns an outbound TCP connection to the pool
@@ -377,8 +380,13 @@ func (t *TCPTransport) Notify(target, self *Vnode) ([]*Vnode, error) {
 
 // Find a successor
 func (t *TCPTransport) FindSuccessors(vn *Vnode, n int, k []byte) ([]*Vnode, error) {
-	resp := tcpBodyVnodeListError{}
-	err := t.networkCall(vn.Host, tcpFindSucReq, tcpBodyFindSuc{Target: vn, Num: n, Key: k}, &resp)
+	resp := new(tcpBodyVnodeListError)
+	vn.fullLock.RLock()
+	str := vn.Host
+	req := tcpBodyFindSuc{Target: vn, Num: n, Key: k}
+	vn.fullLock.RUnlock()
+
+	err := t.networkCall(str, tcpFindSucReq, req, resp)
 
 	if err != nil {
 		return nil, err

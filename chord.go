@@ -126,8 +126,9 @@ type Config struct {
 
 // Represents an Vnode, local or remote
 type Vnode struct {
-	Id   []byte // Virtual ID
-	Host string // Host identifier
+	Id       []byte // Virtual ID
+	Host     string // Host identifier
+	fullLock sync.RWMutex
 }
 
 type localVnodeIface interface {
@@ -144,8 +145,10 @@ type localVnode struct {
 	Vnode
 	ring            *Ring
 	successors      []*Vnode
+	successorsLock  sync.RWMutex
 	predecessors    []*Vnode
 	finger          []*Vnode
+	fingerLock      sync.RWMutex
 	last_finger     int
 	predecessor     *Vnode
 	predecessorLock sync.RWMutex
