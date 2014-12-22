@@ -217,47 +217,41 @@ func (t *TCPTransport) get(vn *Vnode) (VnodeRPC, bool) {
 // Gets an outbound connection to a host
 func (t *TCPTransport) getConn(host string) (*tcpOutConn, error) {
 	// Check if we have a conn cached
-	// var out *tcpOutConn
-	// t.poolLock.Lock()
+	var out *tcpOutConn
+	t.poolLock.Lock()
 	if atomic.LoadInt32(&t.shutdown) == 1 {
-		// t.poolLock.Unlock()
+		t.poolLock.Unlock()
 		return nil, fmt.Errorf("TCP transport is shutdown")
 	}
 
-	/*
-		list, ok := t.pool[host]
-		if ok && len(list) > 0 {
-			out = list[len(list)-1]
-			list = list[:len(list)-1]
-			t.pool[host] = list
+	list, ok := t.pool[host]
+	if ok && len(list) > 0 {
+		out = list[len(list)-1]
+		list = list[:len(list)-1]
+		t.pool[host] = list
+	}
+	t.poolLock.Unlock()
+
+	if out == nil {
+		// Try to establish a connection
+		conn, err := net.DialTimeout("tcp", host, t.timeout)
+		if err != nil {
+			return nil, err
 		}
-		t.poolLock.Unlock()
 
-			if out != nil {
-				// Verify that the socket is valid. Might be closed.
-				//if _, err := out.sock.Read(nil); err == nil {
-				return out, nil
-				//} else {
-				//	out.sock.Close()
-				//}
-			}
-	*/
+		// Setup the socket
+		sock := conn.(*net.TCPConn)
+		t.setupConn(sock)
 
-	// Try to establish a connection
-	conn, err := net.DialTimeout("tcp", host, t.timeout)
-	if err != nil {
-		return nil, err
+		out = &tcpOutConn{host: host, sock: sock}
 	}
 
-	// Setup the socket
-	sock := conn.(*net.TCPConn)
-	t.setupConn(sock)
-	enc := json.NewEncoder(sock)
-	dec := json.NewDecoder(sock)
-	now := time.Now()
+	out.enc = json.NewEncoder(out.sock)
+	out.dec = json.NewDecoder(out.sock)
+	out.used = time.Now()
 
 	// Wrap the sock
-	return &tcpOutConn{host: host, sock: sock, enc: enc, dec: dec, used: now}, nil
+	return out, nil
 }
 
 // Returns an outbound TCP connection to the pool
