@@ -3,13 +3,22 @@ package buddystore
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
 
 type MultiLocalTrans struct {
-	remote Transport
-	hosts  map[string]*LocalTransport
+	remote    Transport
+	hosts     map[string]*LocalTransport
+	hostsLock sync.RWMutex
+}
+
+func (ml *MultiLocalTrans) GetHost(index string) (*LocalTransport, bool) {
+	defer ml.hostsLock.RUnlock()
+	ml.hostsLock.RLock()
+	val, ok := ml.hosts[index]
+	return val, ok
 }
 
 func InitMLTransport(listen string, timeout *time.Duration) *MultiLocalTrans {
@@ -30,7 +39,7 @@ func InitMLTransport(listen string, timeout *time.Duration) *MultiLocalTrans {
 }
 
 func (ml *MultiLocalTrans) ListVnodes(host string) ([]*Vnode, error) {
-	if local, ok := ml.hosts[host]; ok {
+	if local, ok := ml.GetHost(host); ok {
 		return local.ListVnodes(host)
 	}
 	return ml.remote.ListVnodes(host)
@@ -38,7 +47,7 @@ func (ml *MultiLocalTrans) ListVnodes(host string) ([]*Vnode, error) {
 
 // Ping a Vnode, check for liveness
 func (ml *MultiLocalTrans) Ping(v *Vnode) (bool, error) {
-	if local, ok := ml.hosts[v.Host]; ok {
+	if local, ok := ml.GetHost(v.Host); ok {
 		return local.Ping(v)
 	}
 	return ml.remote.Ping(v)
@@ -46,7 +55,7 @@ func (ml *MultiLocalTrans) Ping(v *Vnode) (bool, error) {
 
 // Request a nodes predecessor
 func (ml *MultiLocalTrans) GetPredecessor(v *Vnode) (*Vnode, error) {
-	if local, ok := ml.hosts[v.Host]; ok {
+	if local, ok := ml.GetHost(v.Host); ok {
 		return local.GetPredecessor(v)
 	}
 	return ml.remote.GetPredecessor(v)
@@ -54,7 +63,7 @@ func (ml *MultiLocalTrans) GetPredecessor(v *Vnode) (*Vnode, error) {
 
 // Notify our successor of ourselves
 func (ml *MultiLocalTrans) Notify(target, self *Vnode) ([]*Vnode, error) {
-	if local, ok := ml.hosts[target.Host]; ok {
+	if local, ok := ml.GetHost(target.Host); ok {
 		return local.Notify(target, self)
 	}
 	return ml.remote.Notify(target, self)
@@ -62,7 +71,7 @@ func (ml *MultiLocalTrans) Notify(target, self *Vnode) ([]*Vnode, error) {
 
 // Find a successor
 func (ml *MultiLocalTrans) FindSuccessors(v *Vnode, n int, k []byte) ([]*Vnode, error) {
-	if local, ok := ml.hosts[v.Host]; ok {
+	if local, ok := ml.GetHost(v.Host); ok {
 		return local.FindSuccessors(v, n, k)
 	}
 	return ml.remote.FindSuccessors(v, n, k)
@@ -70,7 +79,7 @@ func (ml *MultiLocalTrans) FindSuccessors(v *Vnode, n int, k []byte) ([]*Vnode, 
 
 // Clears a predecessor if it matches a given vnode. Used to leave.
 func (ml *MultiLocalTrans) ClearPredecessor(target, self *Vnode) error {
-	if local, ok := ml.hosts[target.Host]; ok {
+	if local, ok := ml.GetHost(target.Host); ok {
 		return local.ClearPredecessor(target, self)
 	}
 	return ml.remote.ClearPredecessor(target, self)
@@ -78,7 +87,7 @@ func (ml *MultiLocalTrans) ClearPredecessor(target, self *Vnode) error {
 
 // Instructs a node to skip a given successor. Used to leave.
 func (ml *MultiLocalTrans) SkipSuccessor(target, self *Vnode) error {
-	if local, ok := ml.hosts[target.Host]; ok {
+	if local, ok := ml.GetHost(target.Host); ok {
 		return local.SkipSuccessor(target, self)
 	}
 	return ml.remote.SkipSuccessor(target, self)
@@ -86,22 +95,26 @@ func (ml *MultiLocalTrans) SkipSuccessor(target, self *Vnode) error {
 
 // Request a nodes predecessor list
 func (ml *MultiLocalTrans) GetPredecessorList(v *Vnode) ([]*Vnode, error) {
-	if local, ok := ml.hosts[v.Host]; ok {
+	if local, ok := ml.GetHost(v.Host); ok {
 		return local.GetPredecessorList(v)
 	}
 	return ml.remote.GetPredecessorList(v)
 }
 
 func (ml *MultiLocalTrans) Register(v *Vnode, o VnodeRPC) {
-	local, ok := ml.hosts[v.Host]
+	local, ok := ml.GetHost(v.Host)
 	if !ok {
 		local = InitLocalTransport(nil).(*LocalTransport)
+		ml.hostsLock.Lock()
+		defer ml.hostsLock.Unlock()
 		ml.hosts[v.Host] = local
 	}
 	local.Register(v, o)
 }
 
 func (ml *MultiLocalTrans) Deregister(host string) {
+	ml.hostsLock.Lock()
+	defer ml.hostsLock.Unlock()
 	delete(ml.hosts, host)
 }
 
