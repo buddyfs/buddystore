@@ -289,9 +289,7 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 	}
 
 	// Return our successors list
-	succ_list := make([]*Vnode, len(vn.successors))
-	copy(succ_list, vn.successors)
-	return succ_list, nil
+	return vn.CopyOfSuccessors(), nil
 }
 
 // Fixes up the finger table

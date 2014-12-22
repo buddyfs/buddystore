@@ -167,24 +167,39 @@ type localVnode struct {
 func (lvn *localVnode) Ring() RingIntf {
 	return lvn.ring
 }
+
+func (lvn *localVnode) CopyOfSuccessors() []*Vnode {
+	defer lvn.successorsLock.RUnlock()
+	lvn.successorsLock.RLock()
+	succ_list := make([]*Vnode, len(lvn.successors))
+	copy(succ_list, lvn.successors)
+	return succ_list
+}
+
 func (lvn *localVnode) Successors() []*Vnode {
+	defer lvn.successorsLock.RUnlock()
+	lvn.successorsLock.RLock()
 	return lvn.successors
 }
+
 func (lvn *localVnode) Predecessors() []*Vnode {
 	defer lvn.predecessorLock.RUnlock()
 	lvn.predecessorLock.RLock()
 
 	return lvn.predecessors
 }
+
 func (lvn *localVnode) Predecessor() *Vnode {
 	defer lvn.predecessorLock.RUnlock()
 	lvn.predecessorLock.RLock()
 
 	return lvn.predecessor
 }
+
 func (lvn *localVnode) localVnodeId() []byte {
 	return lvn.Id
 }
+
 func (lvn *localVnode) GetVnode() *Vnode {
 	return &lvn.Vnode
 }
