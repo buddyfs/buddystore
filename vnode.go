@@ -125,6 +125,9 @@ func (vn *localVnode) checkNewSuccessor() error {
 	// Ask our successor for it's predecessor
 	trans := vn.ring.transport
 
+	vn.successorsLock.Lock()
+	defer vn.successorsLock.Unlock()
+
 CHECK_NEW_SUC:
 	succ := vn.successors[0]
 	if succ == nil {
@@ -466,6 +469,9 @@ func (vn *localVnode) leave() error {
 
 // Used to clear our predecessor when a node is leaving
 func (vn *localVnode) ClearPredecessor(p *Vnode) error {
+	defer vn.predecessorLock.Unlock()
+	vn.predecessorLock.Lock()
+
 	if vn.predecessor != nil && vn.predecessor.String() == p.String() {
 		// Inform the delegate
 		conf := vn.ring.config
