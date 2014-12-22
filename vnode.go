@@ -184,8 +184,8 @@ func (vn *localVnode) GetPredecessorList() ([]*Vnode, error) {
 
 	retPredList = make([]*Vnode, 0, vn.ring.config.NumSuccessors+1)
 
-	defer vn.predecessorLock.Unlock()
-	vn.predecessorLock.Lock()
+	defer vn.predecessorLock.RUnlock()
+	vn.predecessorLock.RLock()
 
 	for i := 0; i < vn.ring.config.NumSuccessors+1; i++ {
 		if vn.predecessors[i] != nil {
@@ -360,9 +360,6 @@ func (vn *localVnode) checkPredecessor() error {
 
 // Update the predecessor list
 func (vn *localVnode) updatePredecessorList() error {
-	defer vn.predecessorLock.Unlock()
-	vn.predecessorLock.Lock()
-
 	if vn.predecessor != nil {
 		pred_list, err := vn.ring.transport.GetPredecessorList(vn.predecessor)
 		if err != nil {
@@ -374,6 +371,9 @@ func (vn *localVnode) updatePredecessorList() error {
 		if len(pred_list) > max_pred-1 {
 			pred_list = pred_list[:max_pred-1]
 		}
+
+		defer vn.predecessorLock.Unlock()
+		vn.predecessorLock.Lock()
 
 		// Update local predecessors list
 		for idx, p := range pred_list {
