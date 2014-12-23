@@ -250,6 +250,10 @@ func (vn *localVnode) Notify(maybe_pred *Vnode) ([]*Vnode, error) {
 		if vn.lm != nil && vn.lm.Ring != nil {
 			if !vn.lm.block { // If you are supposed to be blocking, do not start any activity yet
 				nearestNode := vn.lm.Ring.nearestVnode([]byte(vn.lm.Ring.config.RingId))
+
+				nearestNode.successorsLock.RLock()
+				defer nearestNode.successorsLock.RUnlock()
+
 				if nearestNode.successors[0] != nil {
 					if (vn.predecessor == nil && maybe_pred != nil) || bytes.Compare(vn.predecessor.Id, maybe_pred.Id) != 0 {
 						LMVnodes, err := vn.lm.Ring.Lookup(1, []byte(vn.lm.Ring.config.RingId))
@@ -489,6 +493,9 @@ func (vn *localVnode) ClearPredecessor(p *Vnode) error {
 
 // Used to skip a successor when a node is leaving
 func (vn *localVnode) SkipSuccessor(s *Vnode) error {
+	vn.successorsLock.Lock()
+	defer vn.successorsLock.Unlock()
+
 	// Skip if we have a match
 	if vn.successors[0].String() == s.String() {
 		// Inform the delegate
