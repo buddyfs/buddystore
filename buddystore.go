@@ -147,7 +147,7 @@ func (bs *BuddyStore) init() error {
 	// from completing successfully.
 
 	// Join my friends' rings
-	for _, friend := range bs.Config.Friends {
+	for _, friend := range bs.Config.Friends { // TODO : Is the list of friends sub-rings getting populated from the global ring?
 		ring, err := bs.Tracker.JoinRing(friend, bs.Config.LocalOnly)
 
 		if err != nil {

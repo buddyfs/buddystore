@@ -99,7 +99,7 @@ func min(a, b int) int {
 // Returns the vnode nearest a key
 func nearestVnodeToKey(vnodes []*Vnode, key []byte) *Vnode {
 	for i := len(vnodes) - 1; i >= 0; i-- {
-		if bytes.Compare(vnodes[i].Id, key) == -1 {
+		if bytes.Compare(vnodes[i].Id, key) == -1 {  // TODO : How does this promise "nearest Vnode to Key"?
 			return vnodes[i]
 		}
 	}

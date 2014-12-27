@@ -110,6 +110,9 @@ func (vn *localVnode) stabilize() {
 	defer vn.predecessorLock.RUnlock()
 	vn.predecessorLock.RLock()
 
+	defer vn.successorsLock.RUnlock()
+	vn.successorsLock.RLock()
+
 	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
 
 	go vn.store.localRepl()
