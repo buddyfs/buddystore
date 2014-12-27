@@ -107,13 +107,12 @@ func (vn *localVnode) stabilize() {
 	// Locking predecessors because we're passing predecessors by reference.
 	// TODO: Make a copy of predecessors and successors here and reduce scope of
 	// lock.
-	defer vn.predecessorLock.RUnlock()
+	
 	vn.predecessorLock.RLock()
-
-	defer vn.successorsLock.RUnlock()
 	vn.successorsLock.RLock()
-
 	vn.store.updatePredSuccList(vn.predecessors, vn.successors)
+	vn.successorsLock.RUnlock()
+	vn.predecessorLock.RUnlock()
 
 	go vn.store.localRepl()
 	go vn.store.globalRepl()
