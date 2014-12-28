@@ -77,17 +77,20 @@ func (kv KVStoreClientImpl) getWithoutRetry(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	succVnodes, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
+	succVnodesTemp, err := kv.ring.Lookup(kv.ring.GetNumSuccessors(), []byte(key))
 	if err != nil {
 		glog.Errorf("Error listing successors in Get(%q): %q", key, err)
 		return nil, err
 	}
 
-	if len(succVnodes) == 0 {
+	if len(succVnodesTemp) == 0 {
 		glog.Errorf("No successors found during Lookup in Get(%q)", key)
 		return nil, fmt.Errorf("No Successors found")
 	}
 
+	succVnodes := make([]*Vnode, len(succVnodesTemp))
+	copy(succVnodes,succVnodesTemp)
+	// Logic to throw away all local vnodes from the successors list.
 	for i, vnode := range succVnodes {
 		if kv.ring.Transport().IsLocalVnode(vnode) {
 			succVnodes = append(succVnodes[:i], succVnodes[i+1:]...)
