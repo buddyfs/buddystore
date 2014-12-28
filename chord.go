@@ -171,9 +171,7 @@ func (lvn *localVnode) Ring() RingIntf {
 func (lvn *localVnode) CopyOfSuccessors() []*Vnode {
 	defer lvn.successorsLock.RUnlock()
 	lvn.successorsLock.RLock()
-	succ_list := make([]*Vnode, len(lvn.successors))
-	copy(succ_list, lvn.successors)
-	return succ_list
+	return copyOfVnodesList(lvn.successors, len(lvn.successors))
 }
 
 func (lvn *localVnode) Successors() []*Vnode {
