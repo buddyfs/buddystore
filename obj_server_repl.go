@@ -203,7 +203,7 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 	// successors
 	if (kvs.vn.Predecessor() == nil) || ((kvs.vn.Predecessor() != nil) && (betweenRightIncl(kvs.vn.Predecessor().Id, kvs.vn.localVnodeId(), key_hash))) {
 
-		for idx, succVn := range kvs.vn.Successors() {
+		for idx, succVn := range kvs.vn.(*localVnode).Successors() {
 			if succVn != nil {
 				wg.Add(1)
 
@@ -213,7 +213,7 @@ func (kvs *KVStore) incSync(key string, version uint, value []byte) error {
 
 		wg.Wait()
 
-		for idx := range kvs.vn.Successors() {
+		for idx := range kvs.vn.(*localVnode).Successors() {
 			if errs[idx] != nil {
 				return errs[idx]
 			}
