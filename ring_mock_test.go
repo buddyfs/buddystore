@@ -45,23 +45,25 @@ func (m *MockRing) Shutdown() {
 	m.Mock.Called()
 }
 
-func (m MockRing) Transport() Transport {
+func (m *MockRing) Transport() Transport {
+	m.mockLock.Lock()
+	defer m.mockLock.Unlock()
 	return m.transport
 }
 
-func (m MockRing) GetLocalVnode() *Vnode {
+func (m *MockRing) GetLocalVnode() *Vnode {
 	panic("TODO: MockRing.GetLocalVnode")
 }
 
-func (m MockRing) GetLocalLocalVnode() *localVnode {
+func (m *MockRing) GetLocalLocalVnode() *localVnode {
 	panic("TODO: MockRing.GetLocalVnode")
 }
 
-func (m MockRing) GetRingId() string {
+func (m *MockRing) GetRingId() string {
 	panic("TODO: MockRing.GetRingId")
 }
 
-func (m MockRing) GetHashFunc() func() hash.Hash {
+func (m *MockRing) GetHashFunc() func() hash.Hash {
 	return m.hashfunc
 }
 
