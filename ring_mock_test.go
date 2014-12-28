@@ -2,8 +2,8 @@ package buddystore
 
 import (
 	"hash"
-
 	"github.com/stretchr/testify/mock"
+	"sync"
 )
 
 type MockRing struct {
@@ -11,6 +11,7 @@ type MockRing struct {
 	transport     Transport
 	numSuccessors int
 	hashfunc      func() hash.Hash
+	mockLock	  sync.Mutex
 }
 
 func (m MockRing) GetNumSuccessors() int {
@@ -18,6 +19,8 @@ func (m MockRing) GetNumSuccessors() int {
 }
 
 func (m *MockRing) Leave() error {
+	m.mockLock.Lock()
+	defer m.mockLock.Unlock()
 	args := m.Mock.Called()
 	res, _ := args.Get(0).(error)
 
@@ -25,6 +28,8 @@ func (m *MockRing) Leave() error {
 }
 
 func (m *MockRing) Lookup(n int, key []byte) ([]*Vnode, error) {
+	m.mockLock.Lock()
+	defer m.mockLock.Unlock()
 	args := m.Mock.Called(n, key)
 	res, ok := args.Get(0).([]*Vnode)
 
@@ -35,6 +40,8 @@ func (m *MockRing) Lookup(n int, key []byte) ([]*Vnode, error) {
 }
 
 func (m *MockRing) Shutdown() {
+	m.mockLock.Lock()
+	defer m.mockLock.Unlock()
 	m.Mock.Called()
 }
 
