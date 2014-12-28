@@ -409,7 +409,7 @@ func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 	defer vn.successorsLock.RUnlock()
 
 	if betweenRightIncl(vn.Id, vn.successors[0].Id, key) {
-		return vn.successors[:n], nil
+		return copyOfVnodesList(vn.successors, n), nil
 	}
 
 	// Try the closest preceeding nodes
@@ -441,7 +441,7 @@ func (vn *localVnode) FindSuccessors(n int, key []byte) ([]*Vnode, error) {
 			if len(remain) > n {
 				remain = remain[:n]
 			}
-			return remain, nil
+			return copyOfVnodesList(remain, len(remain)), nil
 		}
 	}
 
