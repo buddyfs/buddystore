@@ -1,9 +1,13 @@
 package buddystore
 
-import "github.com/stretchr/testify/mock"
+import (
+	"github.com/stretchr/testify/mock"
+	"sync"
+)
 
 type MockTransport struct {
 	mock.Mock
+	mockLock sync.Mutex // Ideally Mock by itself should be threadsafe - workaround.
 }
 
 func (mt *MockTransport) ListVnodes(string) ([]*Vnode, error) {
@@ -63,6 +67,8 @@ func (mt *MockTransport) InvalidateRLock(*Vnode, string) error {
 }
 
 func (mt *MockTransport) Get(target *Vnode, key string, version uint) ([]byte, error) {
+	mt.mockLock.Lock()
+	defer mt.mockLock.Unlock()
 	args := mt.Mock.Called(target, key, version)
 	res, ok := args.Get(0).([]byte)
 
@@ -73,6 +79,8 @@ func (mt *MockTransport) Get(target *Vnode, key string, version uint) ([]byte, e
 }
 
 func (mt *MockTransport) Set(target *Vnode, key string, version uint, value []byte) error {
+	mt.mockLock.Lock()
+	defer mt.mockLock.Unlock()
 	args := mt.Mock.Called(target, key, version, value)
 	return args.Error(0)
 }
@@ -86,6 +94,8 @@ func (mt *MockTransport) BulkSet(target *Vnode, key string, valLst []KVStoreValu
 }
 
 func (mt *MockTransport) SyncKeys(target *Vnode, ownerVn *Vnode, key string, ver []uint) error {
+	mt.mockLock.Lock()
+	defer mt.mockLock.Unlock()
 	args := mt.Mock.Called(target, ownerVn, key, ver)
 	return args.Error(0)
 }
@@ -107,6 +117,8 @@ func (mt *MockTransport) LeaveRing(target *Vnode, ringId string) error {
 }
 
 func (mt *MockTransport) IsLocalVnode(vn *Vnode) bool {
+	mt.mockLock.Lock()
+	defer mt.mockLock.Unlock()
 	args := mt.Mock.Called(vn)
 	return args.Bool(0)
 }

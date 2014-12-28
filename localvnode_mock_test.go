@@ -1,10 +1,14 @@
 package buddystore
 
-import "github.com/stretchr/testify/mock"
+import (
+	"github.com/stretchr/testify/mock"
+	"sync"
+)
 
 type MockLocalVnode struct {
 	R RingIntf
 	mock.Mock
+	mockLock sync.Mutex
 }
 
 func (mlv *MockLocalVnode) Ring() RingIntf {
@@ -12,6 +16,8 @@ func (mlv *MockLocalVnode) Ring() RingIntf {
 }
 
 func (mlv *MockLocalVnode) Successors() []*Vnode {
+	mlv.mockLock.Lock()
+	defer mlv.mockLock.Unlock()
 	args := mlv.Mock.Called()
 	res, _ := args.Get(0).([]*Vnode)
 
@@ -23,6 +29,8 @@ func (mlv *MockLocalVnode) Predecessors() []*Vnode {
 }
 
 func (mlv *MockLocalVnode) Predecessor() *Vnode {
+	mlv.mockLock.Lock()
+	defer mlv.mockLock.Unlock()
 	args := mlv.Mock.Called()
 	res, _ := args.Get(0).(*Vnode)
 
@@ -30,6 +38,8 @@ func (mlv *MockLocalVnode) Predecessor() *Vnode {
 }
 
 func (mlv *MockLocalVnode) localVnodeId() []byte {
+	mlv.mockLock.Lock()
+	defer mlv.mockLock.Unlock()
 	args := mlv.Mock.Called()
 	res, _ := args.Get(0).([]byte)
 
@@ -37,6 +47,8 @@ func (mlv *MockLocalVnode) localVnodeId() []byte {
 }
 
 func (mlv *MockLocalVnode) GetVnode() *Vnode {
+	mlv.mockLock.Lock()
+	defer mlv.mockLock.Unlock()
 	args := mlv.Mock.Called()
 	res, _ := args.Get(0).(*Vnode)
 
